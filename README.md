@@ -6,6 +6,10 @@ I run an ADSB feeder using [adsb.im](https://adsb.im) with [SkyStats](https://gi
 
 This project is a vibecoded fix meant for my personal use. It uses the same SkyStats backend as the official GUI, but presents the full history in a much more readable way.
 
+It's also optimised for mobile since that was my main priority. 
+
+![image](https://assets.thefilip.com/funplaneviewermobile.png)
+
 ## Setup
 
 The backend defaults to returning only 5 planes, so you need to change that before this GUI is useful. There are two ways to do it:
