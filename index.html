@@ -1,0 +1,1649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fun Plane Viewer</title>
+<style>
+  :root {
+    --bg: #0e1014;
+    --surface: #181a22;
+    --surface2: #20232d;
+    --border: #282b38;
+    --text: #d4d7df;
+    --text-dim: #7a7f92;
+    --accent: #6b8ac4;
+    --accent-dim: #38507a;
+    --green: #6fb88a;
+    --amber: #c9a961;
+    --red: #c97a7a;
+    --tag-bg: #252835;
+    --mil: #6b8ac4;
+    --gov: #9d8fc4;
+    --civ: #6fb89c;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* Header */
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(15, 17, 23, 0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .header h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+  }
+
+  .header h1 .mil-color { color: var(--mil); }
+  .header h1 .gov-color { color: var(--gov); }
+
+  .header-stats {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+
+  .stat-pill {
+    background: var(--surface);
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+  }
+
+  .live-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    background: var(--green);
+    border-radius: 50%;
+    margin-right: 4px;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* Section tabs */
+  .section-tabs {
+    display: flex;
+    gap: 0;
+    margin-top: 10px;
+    margin-bottom: 10px;
+  }
+
+  .section-tab {
+    padding: 9px 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-tab:first-child { border-radius: 8px 0 0 8px; }
+  .section-tab:last-child { border-radius: 0 8px 8px 0; }
+  .section-tab + .section-tab { border-left: none; }
+
+  .section-tab:hover { color: var(--text); }
+
+  .section-tab.active-mil {
+    background: rgba(107, 138, 196, 0.12);
+    border-color: var(--mil);
+    color: var(--mil);
+  }
+
+  .section-tab.active-gov {
+    background: rgba(157, 143, 196, 0.12);
+    border-color: var(--gov);
+    color: var(--gov);
+  }
+
+  .section-tab.active-civ {
+    background: rgba(111, 184, 156, 0.12);
+    border-color: var(--civ);
+    color: var(--civ);
+  }
+
+  .tab-count {
+    font-size: 0.72rem;
+    background: rgba(255,255,255,0.1);
+    padding: 2px 7px;
+    border-radius: 999px;
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .search-box {
+    flex: 1;
+    min-width: 200px;
+    max-width: 360px;
+    position: relative;
+  }
+
+  .search-box input {
+    width: 100%;
+    padding: 8px 12px 8px 34px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 0.85rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .search-box input:focus { border-color: var(--accent); }
+
+  .search-box svg {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    color: var(--text-dim);
+  }
+
+  select, .btn {
+    padding: 8px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 0.82rem;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  select:focus, .btn:hover { border-color: var(--accent); }
+
+  .btn-active {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+  }
+
+  /* Filter chips */
+  .chip-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+
+  .chip {
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .chip:hover { border-color: var(--accent); color: var(--text); }
+  .chip.active { background: var(--accent-dim); border-color: var(--accent); color: #fff; }
+  .chip .count { opacity: 0.6; margin-left: 3px; }
+
+  /* Layout toggle */
+  .view-toggle { display: flex; gap: 0; }
+  .view-toggle .btn {
+    border-radius: 0;
+    padding: 8px 10px;
+  }
+  .view-toggle .btn:first-child { border-radius: 8px 0 0 8px; }
+  .view-toggle .btn:last-child { border-radius: 0 8px 8px 0; }
+
+  /* Grid */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
+    padding: 20px 24px 40px;
+  }
+
+  /* Table */
+  .table-wrap {
+    padding: 16px 24px 40px;
+    overflow-x: auto;
+  }
+
+  .table-wrap table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+
+  .table-wrap th {
+    text-align: left;
+    padding: 10px 12px;
+    background: var(--surface);
+    color: var(--text-dim);
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .table-wrap th:hover { color: var(--text); }
+
+  .table-wrap td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+
+  .table-wrap tr:hover td { background: rgba(107, 138, 196, 0.04); }
+
+  .table-thumb {
+    width: 60px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 4px;
+    background: var(--surface2);
+  }
+
+  /* Card */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: border-color 0.2s, transform 0.15s;
+  }
+
+  .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .card.card-gov:hover { border-color: var(--gov); }
+  .card.card-civ:hover { border-color: var(--civ); }
+
+  .card-img-wrap {
+    position: relative;
+    height: 180px;
+    background: var(--surface2);
+    overflow: hidden;
+  }
+
+  .card-img-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: opacity 0.3s;
+  }
+
+  .img-placeholder {
+    width: 100%;
+    height: 100%;
+    background: var(--surface2);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 16px;
+    text-align: center;
+    gap: 6px;
+  }
+  .img-placeholder .ph-type {
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    line-height: 1.15;
+    color: var(--text);
+    word-break: break-word;
+  }
+  .img-placeholder .ph-op {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    line-height: 1.2;
+    word-break: break-word;
+  }
+  .table-thumb.img-placeholder {
+    width: 60px;
+    height: 40px;
+    padding: 2px 4px;
+    gap: 1px;
+  }
+  .table-thumb.img-placeholder .ph-type {
+    font-size: 0.68rem;
+    font-weight: 700;
+  }
+  .table-thumb.img-placeholder .ph-op {
+    font-size: 0.58rem;
+    display: none;
+  }
+  .modal-img.img-placeholder {
+    border-radius: 16px 16px 0 0;
+  }
+  .modal-img.img-placeholder .ph-type { font-size: 1.8rem; }
+  .modal-img.img-placeholder .ph-op { font-size: 1rem; }
+
+  /* New aircraft highlight */
+  @keyframes new-glow {
+    0%   { box-shadow: 0 0 0 0 rgba(111, 184, 138, 0.55); border-color: var(--green); }
+    70%  { box-shadow: 0 0 0 6px rgba(111, 184, 138, 0);   border-color: var(--green); }
+    100% { box-shadow: 0 0 0 0 rgba(111, 184, 138, 0);     border-color: var(--border); }
+  }
+  .card--new {
+    animation: new-glow 3s ease-out 1;
+    border-color: var(--green);
+  }
+  tr.row--new td {
+    background: rgba(111, 184, 138, 0.08);
+    animation: row-fade 3s ease-out 1;
+  }
+  @keyframes row-fade {
+    0%   { background: rgba(111, 184, 138, 0.22); }
+    100% { background: rgba(111, 184, 138, 0); }
+  }
+
+  /* Table group badge */
+  .tbl-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 6px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #fff;
+  }
+
+  /* Sort indicator on table headers */
+  .table-wrap th .sort-ind {
+    display: inline-block;
+    margin-left: 4px;
+    font-size: 0.7rem;
+    opacity: 0.4;
+  }
+  .table-wrap th.sorted .sort-ind { opacity: 1; color: var(--accent); }
+
+  /* Disabled refresh button */
+  .btn[disabled] { opacity: 0.5; cursor: default; }
+  .btn[disabled]:hover { border-color: var(--border); }
+
+  .card-img-wrap .img-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.5);
+    color: #fff;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+    font-size: 1.1rem;
+    border: none;
+  }
+
+  .card:hover .img-nav { opacity: 1; }
+  .img-nav.left { left: 8px; }
+  .img-nav.right { right: 8px; }
+
+  .card-img-dots {
+    position: absolute;
+    bottom: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 4px;
+  }
+
+  .card-img-dots span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.4);
+  }
+
+  .card-img-dots span.active { background: #fff; }
+
+  .card-category {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #fff;
+  }
+
+  .card-group-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .badge-mil { background: rgba(107, 138, 196, 0.85); color: #fff; }
+  .badge-gov { background: rgba(157, 143, 196, 0.85); color: #fff; }
+  .badge-civ { background: rgba(111, 184, 156, 0.85); color: #fff; }
+
+  .card-body { padding: 14px 16px; }
+
+  .card-type {
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.3;
+    margin-bottom: 2px;
+  }
+
+  .card-operator {
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+  }
+
+  .card-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 16px;
+    font-size: 0.78rem;
+    margin-bottom: 10px;
+  }
+
+  .card-meta dt { color: var(--text-dim); }
+  .card-meta dd { font-weight: 600; }
+
+  .card-tags {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+
+  .tag {
+    background: var(--tag-bg);
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+  }
+
+  .card-seen {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .freshness {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 4px;
+  }
+
+  .fresh-live { background: var(--green); }
+  .fresh-recent { background: var(--amber); }
+  .fresh-stale { background: var(--red); }
+
+  /* Loading & error */
+  .status-msg {
+    text-align: center;
+    padding: 80px 24px;
+    color: var(--text-dim);
+    font-size: 0.95rem;
+  }
+
+  .status-msg .spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .error-msg { color: var(--red); }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    /* Solid bg instead of expensive backdrop-filter */
+    .header {
+      padding: 8px 12px;
+      background: var(--bg);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      transition: padding 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
+      will-change: padding;
+    }
+
+    .header h1 { font-size: 1.05rem; }
+
+    #countPill, #updatedPill { display: none; }
+
+    /* Tabs: equal width, compact */
+    .section-tabs {
+      width: 100%;
+      margin-top: 8px;
+      margin-bottom: 6px;
+      transition: margin 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
+    }
+    .section-tab { flex: 1; justify-content: center; padding: 7px 4px; font-size: 0.76rem; }
+
+    /* Controls: search full width, rest below */
+    .controls { gap: 6px; }
+    .search-box { min-width: 0; max-width: 100%; flex: 1 1 100%; }
+    .search-box input { padding: 7px 10px 7px 30px; font-size: 0.82rem; }
+    select { flex: 1; min-width: 0; padding: 7px 8px; font-size: 0.78rem; }
+    .btn { padding: 7px 10px; font-size: 0.78rem; }
+
+    /* Collapsible wrapper — animate the whole bottom block as one unit.
+       Uses a CSS variable for measured height so the transition is smooth
+       and predictable instead of fighting with max-height: 0. */
+    .header-collapsible {
+      overflow: hidden;
+      height: var(--collapsible-h, auto);
+      opacity: 1;
+      transform: translateY(0);
+      transition:
+        height 0.28s cubic-bezier(0.22, 0.61, 0.36, 1),
+        opacity 0.2s ease,
+        transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
+      will-change: height, opacity, transform;
+    }
+
+    .header.collapsed .header-collapsible {
+      height: 0;
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+
+    .header.collapsed .section-tabs {
+      margin-bottom: 0;
+    }
+
+    /* Chip row: horizontal scroll */
+    .chip-row {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      margin-top: 6px;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .chip-row::-webkit-scrollbar { display: none; }
+
+    /* Grid: single column, tighter */
+    .grid { padding: 10px; gap: 10px; grid-template-columns: 1fr; }
+    .card-img-wrap { height: 200px; }
+
+    /* Kill hover effects on touch — no ghost taps */
+    .card { transition: none; }
+    .card:hover { transform: none; border-color: var(--border); }
+    .card.card-gov:hover { border-color: var(--border); }
+    .card.card-civ:hover { border-color: var(--border); }
+
+    /* Always show nav arrows on touch */
+    .img-nav { opacity: 1 !important; }
+
+    /* Disable expensive image fade transition on mobile */
+    .card-img-wrap img { transition: none; }
+  }
+
+  /* Respect reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    max-width: 600px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .modal-img {
+    width: 100%;
+    height: 260px;
+    object-fit: cover;
+    border-radius: 16px 16px 0 0;
+    background: var(--surface2);
+  }
+
+  .modal-body { padding: 20px 24px; }
+  .modal-body h2 { font-size: 1.25rem; margin-bottom: 4px; }
+  .modal-body .sub { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 16px; }
+
+  .modal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 20px;
+    font-size: 0.85rem;
+    margin-bottom: 16px;
+  }
+
+  .modal-grid dt { color: var(--text-dim); }
+  .modal-grid dd { font-weight: 600; }
+
+  .modal-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(0,0,0,0.5);
+    border: none;
+    color: #fff;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-images {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .modal-images img {
+    flex: 1;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.15s;
+    background: var(--surface2);
+  }
+
+  .modal-images img:hover { border-color: var(--accent); }
+  .modal-images img.selected { border-color: var(--accent); }
+
+  .modal-group-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+
+  /* Mobile modal overrides — must come AFTER default modal styles
+     so the cascade applies them. */
+  @media (max-width: 640px) {
+    .modal-overlay {
+      padding: 0;
+      align-items: flex-end;
+      transition: background 0.2s ease;
+    }
+    .modal {
+      border-radius: 16px 16px 0 0;
+      max-height: 92vh;
+      max-width: 100%;
+      width: 100%;
+      transform: translateY(0);
+      transition: transform 0.3s ease;
+    }
+    .modal-img { height: 220px; border-radius: 16px 16px 0 0; }
+    .modal-body { padding: 16px; }
+    .modal-body h2 { font-size: 1.15rem; word-break: break-word; }
+    .modal-body .sub { font-size: 0.85rem; word-break: break-word; }
+    .modal-grid {
+      grid-template-columns: max-content 1fr;
+      gap: 8px 14px;
+      font-size: 0.85rem;
+    }
+    .modal-grid dd { word-break: break-word; min-width: 0; }
+    .modal-images { gap: 6px; margin-bottom: 14px; }
+    .modal-images img { min-width: 0; height: 64px; }
+    .modal-close {
+      width: 36px;
+      height: 36px;
+      top: 10px;
+      right: 10px;
+      font-size: 1.25rem;
+    }
+  }
+
+  /* Export dropdown */
+  .export-drop {
+    display: none;
+    position: fixed;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    z-index: 9999;
+    min-width: 150px;
+  }
+  .export-drop.open { display: block; }
+  .export-drop button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    background: none; border: none;
+    color: var(--text); font-size: 0.85rem;
+    padding: 8px 14px; text-align: left;
+    cursor: pointer;
+  }
+  .export-drop button:hover { background: var(--border); }
+  .export-drop .export-section {
+    padding: 6px 14px 4px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .export-drop .export-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
+  }
+  .export-toggle .check {
+    display: inline-block;
+    width: 12px;
+    color: transparent;
+    font-weight: 700;
+    font-size: 0.78rem;
+    text-align: center;
+  }
+  .export-toggle[aria-pressed="true"] .check { color: var(--accent); }
+  .export-toggle[aria-pressed="false"] { color: var(--text-dim); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <h1><span class="mil-color">Fun</span> <span class="gov-color">Plane</span> <span style="color:var(--civ)">Viewer</span></h1>
+    <div class="header-stats">
+      <span class="stat-pill"><span class="live-dot"></span> Live</span>
+      <span class="stat-pill" id="countPill">0 aircraft</span>
+      <span class="stat-pill" id="updatedPill">--</span>
+    </div>
+  </div>
+  <div class="section-tabs">
+    <button class="section-tab active-mil" id="tabMil" data-section="mil">
+      Military <span class="tab-count" id="milCount">0</span>
+    </button>
+    <button class="section-tab" id="tabGov" data-section="gov">
+      Government <span class="tab-count" id="govCount">0</span>
+    </button>
+    <button class="section-tab" id="tabCiv" data-section="civ">
+      Civilian <span class="tab-count" id="civCount">0</span>
+    </button>
+  </div>
+  <div class="header-collapsible" id="headerCollapsible">
+    <div class="controls">
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" id="searchInput" placeholder="Search type, operator, callsign, ICAO...">
+      </div>
+      <select id="sortSelect">
+        <option value="seen_desc">Last Seen (newest)</option>
+        <option value="seen_asc">Last Seen (oldest)</option>
+        <option value="type_asc">Type A-Z</option>
+        <option value="operator_asc">Operator A-Z</option>
+        <option value="category_asc">Category A-Z</option>
+      </select>
+      <div class="view-toggle">
+        <button class="btn btn-active" id="btnGrid" title="Grid view" aria-label="Grid view" data-view="grid">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+        </button>
+        <button class="btn" id="btnTable" title="Table view" aria-label="Table view" data-view="table">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="2" width="14" height="2" rx="0.5"/><rect x="1" y="7" width="14" height="2" rx="0.5"/><rect x="1" y="12" width="14" height="2" rx="0.5"/></svg>
+        </button>
+      </div>
+      <button class="btn" id="btnRefresh">Refresh</button>
+      <div class="export-wrap" id="exportWrap">
+        <button class="btn" id="btnExport" title="Export current list">Export ▾</button>
+      </div>
+    </div>
+    <div class="chip-row" id="categoryChips"></div>
+  </div>
+</div>
+
+<div class="export-drop" id="exportDrop">
+  <div class="export-section">Options</div>
+  <button type="button" class="export-toggle" id="btnExportTags" aria-pressed="true">
+    <span class="check">✓</span>Include tags
+  </button>
+  <div class="export-divider"></div>
+  <div class="export-section">Download as</div>
+  <button id="exportCsv"><span class="check"></span>CSV</button>
+  <button id="exportJson"><span class="check"></span>JSON</button>
+</div>
+
+<div id="content">
+  <div class="status-msg"><div class="spinner"></div>Loading aircraft data...</div>
+</div>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal" id="modalInner">
+    <div style="position:relative">
+      <div id="modalImgSlot"></div>
+      <button class="modal-close" id="modalCloseBtn" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <h2 id="modalType"></h2>
+      <div class="sub" id="modalOperator"></div>
+      <div class="modal-images" id="modalThumbs"></div>
+      <dl class="modal-grid" id="modalGrid"></dl>
+      <div class="card-tags" id="modalTags"></div>
+      <div class="card-seen" style="margin-top:14px" id="modalSeen"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_BASE = `http://${window.location.hostname}:5173`;
+const API = {
+  mil: `${API_BASE}/api/stats/interesting/military`,
+  gov: `${API_BASE}/api/stats/interesting/government`,
+  civ: `${API_BASE}/api/stats/interesting/civilian`,
+};
+const REFRESH_INTERVAL = 60000;
+const FETCH_TIMEOUT = 10000;
+
+let data = { mil: [], gov: [], civ: [] };
+let activeSection = 'mil';
+let view = 'grid';
+let activeCategories = new Set();
+let imageIndices = {};
+let prevHexes = { mil: null, gov: null, civ: null };
+let newHexes  = { mil: new Set(), gov: new Set(), civ: new Set() };
+let dataSig   = { mil: '', gov: '', civ: '' };
+let sortState = { key: 'seen', dir: 'desc' };
+let currentController = null;
+let inFlight = false;
+let pollTimer = null;
+let modalHex = null;
+let pendingRender = false;
+
+const SORT_MAP = {
+  'seen_desc':    { key: 'seen',     dir: 'desc' },
+  'seen_asc':     { key: 'seen',     dir: 'asc'  },
+  'type_asc':     { key: 'type',     dir: 'asc'  },
+  'operator_asc': { key: 'operator', dir: 'asc'  },
+  'category_asc': { key: 'category', dir: 'asc'  },
+};
+function sortSelectValue() {
+  for (const [k, v] of Object.entries(SORT_MAP)) {
+    if (v.key === sortState.key && v.dir === sortState.dir) return k;
+  }
+  return '';
+}
+
+function allPlanes() {
+  return data[activeSection];
+}
+
+async function fetchSection(section, signal, cacheBust) {
+  const url = cacheBust ? `${API[section]}?_=${Date.now()}` : API[section];
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+function computeSignature(arr) {
+  if (!arr || !arr.length) return '0';
+  const first = arr[0], last = arr[arr.length - 1];
+  return `${arr.length}|${first.hex}:${first.seen_epoch}|${last.hex}:${last.seen_epoch}`;
+}
+
+function diffHexes(section, arr) {
+  const currentSet = new Set(arr.map(p => p.hex));
+  const prev = prevHexes[section];
+  if (prev === null) {
+    // First fetch — don't flag everything as new.
+    newHexes[section] = new Set();
+  } else {
+    const added = new Set();
+    currentSet.forEach(h => { if (!prev.has(h)) added.add(h); });
+    newHexes[section] = added;
+  }
+  prevHexes[section] = currentSet;
+}
+
+async function fetchAll(manual) {
+  // Abort any in-flight request before starting a new one.
+  if (currentController) currentController.abort();
+  const controller = new AbortController();
+  currentController = controller;
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+
+  const btn = document.getElementById('btnRefresh');
+  inFlight = true;
+  if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+
+  try {
+    const [mil, gov, civ] = await Promise.all([
+      fetchSection('mil', controller.signal, manual),
+      fetchSection('gov', controller.signal, manual),
+      fetchSection('civ', controller.signal, manual),
+    ]);
+
+    const newSig = {
+      mil: computeSignature(mil),
+      gov: computeSignature(gov),
+      civ: computeSignature(civ),
+    };
+    const changed = newSig.mil !== dataSig.mil
+                 || newSig.gov !== dataSig.gov
+                 || newSig.civ !== dataSig.civ;
+
+    diffHexes('mil', mil);
+    diffHexes('gov', gov);
+    diffHexes('civ', civ);
+
+    data.mil = mil;
+    data.gov = gov;
+    data.civ = civ;
+    dataSig = newSig;
+
+    document.getElementById('milCount').textContent = mil.length;
+    document.getElementById('govCount').textContent = gov.length;
+    document.getElementById('civCount').textContent = civ.length;
+    updateStats();
+    buildCategoryChips();
+
+    if (changed || manual) {
+      if (modalHex) {
+        // Don't disturb the DOM while the user has the modal open.
+        pendingRender = true;
+      } else {
+        preservingScroll(render);
+      }
+    }
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      // Don't report if superseded by a newer request or if the tab was hidden.
+      if (controller !== currentController) return;
+      if (document.visibilityState === 'hidden') return;
+      document.getElementById('content').innerHTML =
+        `<div class="status-msg error-msg">Request timed out.<br><br><button class="btn" id="retryBtn">Retry</button></div>`;
+      document.getElementById('retryBtn').addEventListener('click', () => fetchAll(true));
+    } else {
+      document.getElementById('content').innerHTML =
+        `<div class="status-msg error-msg">Failed to load data: ${esc(e.message)}<br><br><button class="btn" id="retryBtn">Retry</button></div>`;
+      document.getElementById('retryBtn').addEventListener('click', () => fetchAll(true));
+    }
+  } finally {
+    clearTimeout(timeoutId);
+    if (controller === currentController) {
+      currentController = null;
+      inFlight = false;
+      if (btn) { btn.disabled = false; btn.textContent = 'Refresh'; }
+    }
+  }
+}
+
+function preservingScroll(fn) {
+  const y = window.scrollY;
+  fn();
+  // Restore after layout settles. Only restore if the page is still tall enough.
+  requestAnimationFrame(() => {
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    window.scrollTo(0, Math.min(y, Math.max(0, max)));
+  });
+}
+
+function updateStats() {
+  const planes = allPlanes();
+  document.getElementById('countPill').textContent = `${planes.length} aircraft`;
+  document.getElementById('updatedPill').textContent = `Updated ${new Date().toLocaleTimeString()}`;
+}
+
+function switchSection(section) {
+  activeSection = section;
+  activeCategories.clear();
+
+  document.getElementById('tabMil').className = 'section-tab' + (section === 'mil' ? ' active-mil' : '');
+  document.getElementById('tabGov').className = 'section-tab' + (section === 'gov' ? ' active-gov' : '');
+  document.getElementById('tabCiv').className = 'section-tab' + (section === 'civ' ? ' active-civ' : '');
+
+  // Changing section shows the list from scratch — don't flash every card as "new".
+  newHexes[section] = new Set();
+
+  updateStats();
+  buildCategoryChips();
+  render();
+}
+
+function buildCategoryChips() {
+  const planes = allPlanes();
+  const cats = {};
+  planes.forEach(p => { cats[p.category] = (cats[p.category] || 0) + 1; });
+  const sorted = Object.entries(cats).sort((a, b) => b[1] - a[1]);
+  const wrap = document.getElementById('categoryChips');
+  wrap.innerHTML = '';
+  sorted.forEach(([cat, count]) => {
+    const chip = document.createElement('span');
+    chip.className = 'chip' + (activeCategories.has(cat) ? ' active' : '');
+    chip.innerHTML = `${esc(cat)}<span class="count">${count}</span>`;
+    chip.onclick = () => {
+      if (activeCategories.has(cat)) activeCategories.delete(cat);
+      else activeCategories.add(cat);
+      chip.classList.toggle('active');
+      render();
+    };
+    wrap.appendChild(chip);
+  });
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function getFiltered() {
+  const q = document.getElementById('searchInput').value.toLowerCase().trim();
+  const planes = allPlanes();
+
+  let filtered = planes.filter(p => {
+    if (activeCategories.size > 0 && !activeCategories.has(p.category)) return false;
+    if (q) {
+      const hay = [p.type, p.operator, p.flight, p.icao, p.registration, p.category, p.tag1, p.tag2, p.tag3, p.icao_type].join(' ').toLowerCase();
+      return hay.includes(q);
+    }
+    return true;
+  });
+
+  const { key, dir } = sortState;
+  const mult = dir === 'asc' ? 1 : -1;
+  const cmpStr = (a, b) => (a || '').localeCompare(b || '');
+  filtered.sort((a, b) => {
+    switch (key) {
+      case 'seen':      return (a.seen_epoch - b.seen_epoch) * mult;
+      case 'type':      return cmpStr(a.type, b.type) * mult;
+      case 'operator':  return cmpStr(a.operator, b.operator) * mult;
+      case 'callsign':  return cmpStr(a.flight, b.flight) * mult;
+      case 'reg':       return cmpStr(a.registration, b.registration) * mult;
+      case 'icao':      return cmpStr(a.icao, b.icao) * mult;
+      case 'category':  return cmpStr(a.category, b.category) * mult;
+      default: return 0;
+    }
+  });
+
+  return filtered;
+}
+
+function setSort(key) {
+  if (sortState.key === key) {
+    sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortState.key = key;
+    // Default direction: desc for time/numeric, asc for strings.
+    sortState.dir = key === 'seen' ? 'desc' : 'asc';
+  }
+  const sel = document.getElementById('sortSelect');
+  const match = sortSelectValue();
+  if (match) sel.value = match;
+  render();
+}
+
+// Image helpers — build an <img> or a text placeholder.
+function imgTag(url, p, extraClass) {
+  const cls = extraClass ? ` ${extraClass}` : '';
+  if (!url) return placeholderTag(p, extraClass);
+  return `<img class="card-real-img${cls}" src="${encodeURI(url)}" alt="${esc(p.type || '')}" loading="lazy" data-fallback-hex="${esc(p.hex)}">`;
+}
+function placeholderTag(p, extraClass) {
+  const cls = extraClass ? ` ${extraClass}` : '';
+  const type = esc(p.type || p.icao_type || '');
+  const op = esc(p.operator || '');
+  return `<div class="img-placeholder${cls}"><div class="ph-type">${type}</div>${op ? `<div class="ph-op">${op}</div>` : ''}</div>`;
+}
+// Global: swap broken images for text placeholders.
+document.addEventListener('error', (e) => {
+  const t = e.target;
+  if (!(t instanceof HTMLImageElement)) return;
+  if (!t.classList.contains('card-real-img')) return;
+  const hex = t.dataset.fallbackHex;
+  const p = findPlane(hex);
+  if (!p) { t.style.display = 'none'; return; }
+  const extras = [...t.classList].filter(c => c !== 'card-real-img').join(' ');
+  t.outerHTML = placeholderTag(p, extras);
+}, true);
+
+function findPlane(hex) {
+  for (const s of ['mil','gov','civ']) {
+    const hit = data[s].find(p => p.hex === hex);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+function timeAgo(epoch) {
+  const diff = Math.floor(Date.now() / 1000) - epoch;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+function freshClass(epoch) {
+  const diff = Math.floor(Date.now() / 1000) - epoch;
+  if (diff < 3600) return 'fresh-live';
+  if (diff < 86400) return 'fresh-recent';
+  return 'fresh-stale';
+}
+
+function getImages(p) {
+  return [p.image_link_1, p.image_link_2, p.image_link_3].filter(Boolean);
+}
+
+function datestamp() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function triggerDownload(content, filename, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportIncludesTags() {
+  const btn = document.getElementById('btnExportTags');
+  return btn ? btn.getAttribute('aria-pressed') === 'true' : true;
+}
+
+function exportFilename(ext) {
+  const suffix = exportIncludesTags() ? '' : '-notags';
+  return `aircraft-${activeSection}-${datestamp()}${suffix}.${ext}`;
+}
+
+function exportCSV() {
+  const fields = exportIncludesTags()
+    ? ['hex','type','operator','flight','registration','icao_type','category','group','tag1','tag2','tag3','seen']
+    : ['hex','type','operator','flight','registration','icao_type','category','group','seen'];
+  const header = fields.join(',');
+  const rows = getFiltered().map(p =>
+    fields.map(f => {
+      const v = String(p[f] ?? '');
+      return (v.includes(',') || v.includes('"') || v.includes('\n'))
+        ? `"${v.replace(/"/g, '""')}"` : v;
+    }).join(',')
+  );
+  triggerDownload([header, ...rows].join('\n'), exportFilename('csv'), 'text/csv');
+}
+
+function exportJSON() {
+  const items = exportIncludesTags()
+    ? getFiltered()
+    : getFiltered().map(({ tag1, tag2, tag3, ...rest }) => rest);
+  triggerDownload(
+    JSON.stringify(items, null, 2),
+    exportFilename('json'),
+    'application/json'
+  );
+}
+
+function groupBadge(p) {
+  const g = (p.group || '').toLowerCase();
+  if (g === 'mil') return '<span class="card-group-badge badge-mil">MIL</span>';
+  if (g === 'gov') return '<span class="card-group-badge badge-gov">GOV</span>';
+  if (g === 'civ') return '<span class="card-group-badge badge-civ">CIV</span>';
+  return '';
+}
+
+function render() {
+  const items = getFiltered();
+  if (items.length === 0) {
+    document.getElementById('content').innerHTML = '<div class="status-msg">No aircraft match your filters.</div>';
+    return;
+  }
+  if (view === 'grid') renderGrid(items);
+  else renderTable(items);
+}
+
+function renderGrid(items) {
+  const fresh = newHexes[activeSection] || new Set();
+  const html = items.map(p => {
+    const imgs = getImages(p);
+    const idx = imageIndices[p.hex] || 0;
+    const imgSrc = imgs[idx] || '';
+    const dots = imgs.map((_, i) => `<span class="${i === idx ? 'active' : ''}"></span>`).join('');
+    const grp = (p.group || '').toLowerCase();
+    const cardClass = grp === 'gov' ? ' card-gov' : grp === 'civ' ? ' card-civ' : '';
+    const newClass = fresh.has(p.hex) ? ' card--new' : '';
+
+    return `
+    <div class="card${cardClass}${newClass}" data-hex="${esc(p.hex)}">
+      <div class="card-img-wrap">
+        ${imgs.length ? imgTag(imgSrc, p) : placeholderTag(p)}
+        ${imgs.length > 1 ? `
+          <button class="img-nav left" data-action="img-prev" aria-label="Previous image">&lsaquo;</button>
+          <button class="img-nav right" data-action="img-next" aria-label="Next image">&rsaquo;</button>
+          <div class="card-img-dots">${dots}</div>
+        ` : ''}
+        <div class="card-category">${esc(p.category)}</div>
+        ${groupBadge(p)}
+      </div>
+      <div class="card-body" data-action="open-modal" style="cursor:pointer">
+        <div class="card-type">${esc(p.type || p.icao_type)}</div>
+        <div class="card-operator">${esc(p.operator)}${p.flight ? ` &mdash; ${esc(p.flight)}` : ''}</div>
+        <dl class="card-meta">
+          <dt>Reg</dt><dd>${esc(p.registration || '---')}</dd>
+          <dt>ICAO</dt><dd>${esc(p.icao)}</dd>
+          <dt>Type Code</dt><dd>${esc(p.icao_type)}</dd>
+          <dt>Callsign</dt><dd>${esc(p.flight || '---')}</dd>
+        </dl>
+        <div class="card-tags">
+          ${p.tag1 ? `<span class="tag">${esc(p.tag1)}</span>` : ''}
+          ${p.tag2 ? `<span class="tag">${esc(p.tag2)}</span>` : ''}
+          ${p.tag3 ? `<span class="tag">${esc(p.tag3)}</span>` : ''}
+        </div>
+        <div class="card-seen">
+          <span><span class="freshness ${freshClass(p.seen_epoch)}"></span>${timeAgo(p.seen_epoch)}</span>
+          <span>${esc(new Date(p.seen).toLocaleString())}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('content').innerHTML = `<div class="grid">${html}</div>`;
+}
+
+function renderTable(items) {
+  const fresh = newHexes[activeSection] || new Set();
+  const rows = items.map(p => {
+    const img = p.image_link_1;
+    const grp = (p.group || '').toLowerCase();
+    const badgeClass = grp === 'gov' ? 'badge-gov' : grp === 'civ' ? 'badge-civ' : 'badge-mil';
+    const badgeLabel = grp === 'gov' ? 'GOV' : grp === 'civ' ? 'CIV' : 'MIL';
+    const rowCls = fresh.has(p.hex) ? ' row--new' : '';
+    return `<tr class="${rowCls.trim()}" data-hex="${esc(p.hex)}" data-action="open-modal" style="cursor:pointer">
+      <td><span class="tbl-badge ${badgeClass}">${badgeLabel}</span></td>
+      <td>${img ? imgTag(img, p, 'table-thumb') : `<span class="table-thumb img-placeholder"><span class="ph-type">${esc(p.type || p.icao_type || '')}</span></span>`}</td>
+      <td><strong>${esc(p.type || p.icao_type)}</strong></td>
+      <td>${esc(p.operator)}</td>
+      <td>${esc(p.flight || '---')}</td>
+      <td>${esc(p.registration || '---')}</td>
+      <td>${esc(p.icao)}</td>
+      <td>${esc(p.category)}</td>
+      <td><span class="freshness ${freshClass(p.seen_epoch)}"></span> ${timeAgo(p.seen_epoch)}</td>
+      <td>${[p.tag1, p.tag2, p.tag3].filter(Boolean).map(t => `<span class="tag">${esc(t)}</span>`).join(' ')}</td>
+    </tr>`;
+  }).join('');
+
+  const ind = (k) => {
+    if (sortState.key !== k) return '<span class="sort-ind">↕</span>';
+    return `<span class="sort-ind">${sortState.dir === 'asc' ? '▲' : '▼'}</span>`;
+  };
+  const cls = (k) => sortState.key === k ? 'sorted' : '';
+
+  document.getElementById('content').innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th></th>
+          <th></th>
+          <th class="${cls('type')}"     data-sort="type">Type${ind('type')}</th>
+          <th class="${cls('operator')}" data-sort="operator">Operator${ind('operator')}</th>
+          <th class="${cls('callsign')}" data-sort="callsign">Callsign${ind('callsign')}</th>
+          <th class="${cls('reg')}"      data-sort="reg">Reg${ind('reg')}</th>
+          <th class="${cls('icao')}"     data-sort="icao">ICAO${ind('icao')}</th>
+          <th class="${cls('category')}" data-sort="category">Category${ind('category')}</th>
+          <th class="${cls('seen')}"     data-sort="seen">Last Seen${ind('seen')}</th>
+          <th>Tags</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function cycleImg(hex, dir) {
+  const planes = allPlanes();
+  const p = planes.find(x => x.hex === hex);
+  if (!p) return;
+  const imgs = getImages(p);
+  if (imgs.length <= 1) return;
+  const cur = imageIndices[hex] || 0;
+  imageIndices[hex] = (cur + dir + imgs.length) % imgs.length;
+  render();
+}
+
+function setView(v) {
+  view = v;
+  document.getElementById('btnGrid').classList.toggle('btn-active', v === 'grid');
+  document.getElementById('btnTable').classList.toggle('btn-active', v === 'table');
+  render();
+}
+
+function openModal(hex) {
+  const p = findPlane(hex);
+  if (!p) return;
+  const imgs = getImages(p);
+  const mainSlot = document.getElementById('modalImgSlot');
+  if (imgs[0]) {
+    mainSlot.innerHTML = `<img class="modal-img card-real-img" id="modalImg" src="${encodeURI(imgs[0])}" alt="${esc(p.type || '')}" data-fallback-hex="${esc(p.hex)}">`;
+  } else {
+    mainSlot.innerHTML = `<div class="modal-img img-placeholder"><div class="ph-type">${esc(p.type || p.icao_type || '')}</div><div class="ph-op">${esc(p.operator || '')}</div></div>`;
+  }
+
+  const grp = (p.group || '').toLowerCase();
+  const badgeClass = grp === 'gov' ? 'badge-gov' : grp === 'civ' ? 'badge-civ' : 'badge-mil';
+  const badgeLabel = grp === 'gov' ? 'GOV' : grp === 'civ' ? 'CIV' : 'MIL';
+  document.getElementById('modalType').innerHTML =
+    `${esc(p.type || p.icao_type)} <span class="modal-group-badge ${badgeClass}">${badgeLabel}</span>`;
+  document.getElementById('modalOperator').textContent = `${p.operator}${p.flight ? ' — ' + p.flight : ''}`;
+
+  const thumbs = document.getElementById('modalThumbs');
+  thumbs.innerHTML = imgs.map((url, i) =>
+    `<img src="${encodeURI(url)}" class="${i === 0 ? 'selected' : ''}" data-url="${esc(url)}" onerror="this.style.display='none'">`
+  ).join('');
+
+  const grid = document.getElementById('modalGrid');
+  grid.innerHTML = `
+    <dt>Registration</dt><dd>${esc(p.registration || '---')}</dd>
+    <dt>ICAO Hex</dt><dd>${esc(p.icao)}</dd>
+    <dt>Type Code</dt><dd>${esc(p.icao_type)}</dd>
+    <dt>Callsign</dt><dd>${esc(p.flight || '---')}</dd>
+    <dt>Category</dt><dd>${esc(p.category)}</dd>
+    <dt>Group</dt><dd>${esc(p.group)}</dd>
+  `;
+
+  const tags = document.getElementById('modalTags');
+  tags.innerHTML = [p.tag1, p.tag2, p.tag3].filter(Boolean).map(t => `<span class="tag">${esc(t)}</span>`).join('');
+
+  document.getElementById('modalSeen').innerHTML = `
+    <span><span class="freshness ${freshClass(p.seen_epoch)}"></span>${timeAgo(p.seen_epoch)}</span>
+    <span>${esc(new Date(p.seen).toLocaleString())}</span>
+  `;
+
+  modalHex = hex;
+  document.getElementById('modal').classList.add('open');
+}
+
+function selectModalImg(el, url) {
+  const mainSlot = document.getElementById('modalImgSlot');
+  const p = modalHex ? findPlane(modalHex) : null;
+  if (p) {
+    mainSlot.innerHTML = `<img class="modal-img card-real-img" id="modalImg" src="${encodeURI(url)}" alt="${esc(p.type || '')}" data-fallback-hex="${esc(p.hex)}">`;
+  }
+  el.parentNode.querySelectorAll('img').forEach(x => x.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function closeModal(e) {
+  if (!e || e.target.classList.contains('modal-overlay')) {
+    document.getElementById('modal').classList.remove('open');
+    modalHex = null;
+    if (pendingRender) {
+      pendingRender = false;
+      preservingScroll(() => { buildCategoryChips(); render(); });
+    }
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('modal').classList.contains('open')) {
+    closeModal();
+  }
+});
+
+// --- Debounced search ---
+let searchTimer = null;
+document.getElementById('searchInput').addEventListener('input', () => {
+  if (searchTimer) clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => { searchTimer = null; render(); }, 120);
+});
+
+document.getElementById('sortSelect').addEventListener('change', (e) => {
+  const mapped = SORT_MAP[e.target.value];
+  if (mapped) { sortState = { ...mapped }; render(); }
+});
+
+// --- Delegated click handlers ---
+document.getElementById('content').addEventListener('click', (e) => {
+  const th = e.target.closest('th[data-sort]');
+  if (th) { setSort(th.dataset.sort); return; }
+
+  const cardEl = e.target.closest('.card, tr[data-hex]');
+  if (!cardEl) return;
+  const hex = cardEl.dataset.hex;
+  if (!hex) return;
+
+  const actionEl = e.target.closest('[data-action]');
+  const action = actionEl ? actionEl.dataset.action : null;
+
+  if (action === 'img-prev') { e.stopPropagation(); cycleImg(hex, -1); return; }
+  if (action === 'img-next') { e.stopPropagation(); cycleImg(hex, 1); return; }
+  if (action === 'open-modal' || !action) { openModal(hex); }
+});
+
+// Section tabs
+document.querySelectorAll('.section-tab').forEach(btn => {
+  btn.addEventListener('click', () => switchSection(btn.dataset.section));
+});
+
+// View toggle
+document.querySelectorAll('.view-toggle .btn').forEach(btn => {
+  btn.addEventListener('click', () => setView(btn.dataset.view));
+});
+
+// Refresh
+document.getElementById('btnRefresh').addEventListener('click', () => {
+  if (inFlight) return;
+  fetchAll(true);
+});
+
+// Export dropdown
+const exportDrop = document.getElementById('exportDrop');
+document.getElementById('btnExport').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const isOpen = exportDrop.classList.contains('open');
+  if (!isOpen) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    exportDrop.style.top  = (rect.bottom + 6) + 'px';
+    exportDrop.style.right = (window.innerWidth - rect.right) + 'px';
+  }
+  exportDrop.classList.toggle('open');
+});
+exportDrop.addEventListener('click', (e) => e.stopPropagation());
+document.getElementById('btnExportTags').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  btn.setAttribute('aria-pressed', btn.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+});
+document.getElementById('exportCsv').addEventListener('click', () => {
+  exportCSV();
+  exportDrop.classList.remove('open');
+});
+document.getElementById('exportJson').addEventListener('click', () => {
+  exportJSON();
+  exportDrop.classList.remove('open');
+});
+document.addEventListener('click', () => exportDrop.classList.remove('open'));
+
+// Modal close / overlay
+document.getElementById('modal').addEventListener('click', (e) => {
+  if (e.target.id === 'modal') closeModal(e);
+});
+document.getElementById('modalCloseBtn').addEventListener('click', () => closeModal());
+document.getElementById('modalThumbs').addEventListener('click', (e) => {
+  const img = e.target.closest('img[data-url]');
+  if (img) selectModalImg(img, img.dataset.url);
+});
+
+// Auto-collapse header on mobile when scrolling down, expand on scroll up.
+// Uses a measured height -> CSS variable so the transition is smooth, plus
+// a passive scroll listener and a small hysteresis to avoid flicker.
+const header = document.querySelector('.header');
+const collapsible = document.getElementById('headerCollapsible');
+
+let lastScrollY = window.scrollY;
+let accumDelta = 0;
+let ticking = false;
+let isMobile = window.matchMedia('(max-width: 640px)').matches;
+
+function measureCollapsible() {
+  if (!collapsible) return;
+  // Temporarily clear the explicit height to read natural height.
+  const prev = collapsible.style.height;
+  collapsible.style.height = 'auto';
+  const h = collapsible.scrollHeight;
+  collapsible.style.height = prev;
+  collapsible.style.setProperty('--collapsible-h', h + 'px');
+}
+
+// Re-measure on resize and after content renders (chips/controls may grow).
+window.addEventListener('resize', () => {
+  isMobile = window.matchMedia('(max-width: 640px)').matches;
+  measureCollapsible();
+}, { passive: true });
+
+// Hook into render so chip changes update the measured height.
+const _origBuildChips = buildCategoryChips;
+buildCategoryChips = function() {
+  _origBuildChips.apply(this, arguments);
+  // Wait a frame for layout, then re-measure.
+  requestAnimationFrame(measureCollapsible);
+};
+
+window.addEventListener('scroll', () => {
+  if (ticking || !isMobile) {
+    if (!isMobile && header.classList.contains('collapsed')) {
+      header.classList.remove('collapsed');
+    }
+    lastScrollY = window.scrollY;
+    return;
+  }
+  ticking = true;
+  requestAnimationFrame(() => {
+    const sy = window.scrollY;
+    const delta = sy - lastScrollY;
+
+    // Accumulate same-direction movement; reset on direction change.
+    if ((delta > 0 && accumDelta < 0) || (delta < 0 && accumDelta > 0)) {
+      accumDelta = 0;
+    }
+    accumDelta += delta;
+
+    // Hysteresis: need ~12px of sustained movement before toggling.
+    if (accumDelta > 12 && sy > 60) {
+      if (!header.classList.contains('collapsed')) {
+        header.classList.add('collapsed');
+      }
+      accumDelta = 0;
+    } else if (accumDelta < -12) {
+      if (header.classList.contains('collapsed')) {
+        header.classList.remove('collapsed');
+      }
+      accumDelta = 0;
+    }
+
+    lastScrollY = sy;
+    ticking = false;
+  });
+}, { passive: true });
+
+function startPolling() {
+  stopPolling();
+  pollTimer = setInterval(() => fetchAll(false), REFRESH_INTERVAL);
+}
+function stopPolling() {
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    stopPolling();
+    if (currentController) currentController.abort();
+  } else {
+    fetchAll(false);
+    startPolling();
+  }
+});
+
+fetchAll(false);
+startPolling();
+</script>
+</body>
+</html>
