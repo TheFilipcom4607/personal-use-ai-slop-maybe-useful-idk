@@ -724,6 +724,8 @@
     margin-bottom: 16px;
   }
 
+  .modal-images[hidden] { display: none; }
+
   .modal-images img {
     flex: 1;
     height: 80px;
@@ -833,6 +835,51 @@
   }
   .export-toggle[aria-pressed="true"] .check { color: var(--accent); }
   .export-toggle[aria-pressed="false"] { color: var(--text-dim); }
+  .file-input {
+    display: none;
+  }
+
+  .app-dialog-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(0,0,0,0.72);
+    backdrop-filter: blur(4px);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .app-dialog-overlay.open { display: flex; }
+
+  .app-dialog {
+    width: min(420px, 100%);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 18px 60px rgba(0,0,0,0.35);
+    padding: 20px;
+  }
+
+  .app-dialog h2 {
+    font-size: 1rem;
+    margin-bottom: 8px;
+  }
+
+  .app-dialog p {
+    color: var(--text-dim);
+    font-size: 0.88rem;
+    line-height: 1.45;
+    white-space: pre-line;
+  }
+
+  .app-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 18px;
+  }
 </style>
 </head>
 <body>
@@ -841,7 +888,7 @@
   <div class="header-top">
     <h1><span class="mil-color">Fun</span> <span class="gov-color">Plane</span> <span style="color:var(--civ)">Viewer</span></h1>
     <div class="header-stats">
-      <span class="stat-pill"><span class="live-dot"></span> Live</span>
+      <span class="stat-pill" id="sourcePill"><span class="live-dot"></span> Live</span>
       <span class="stat-pill" id="countPill">0 aircraft</span>
       <span class="stat-pill" id="updatedPill">--</span>
     </div>
@@ -879,6 +926,8 @@
         </button>
       </div>
       <button class="btn" id="btnRefresh">Refresh</button>
+      <button class="btn" id="btnImport" title="Import CSV or JSON export">Import</button>
+      <input class="file-input" type="file" id="importFile" accept=".csv,.json,text/csv,application/json">
       <div class="export-wrap" id="exportWrap">
         <button class="btn" id="btnExport" title="Export current list">Export ▾</button>
       </div>
@@ -919,8 +968,19 @@
   </div>
 </div>
 
+<div class="app-dialog-overlay" id="appDialog" aria-hidden="true">
+  <div class="app-dialog" role="dialog" aria-modal="true" aria-labelledby="appDialogTitle" aria-describedby="appDialogMessage">
+    <h2 id="appDialogTitle"></h2>
+    <p id="appDialogMessage"></p>
+    <div class="app-dialog-actions">
+      <button class="btn" type="button" id="appDialogCancel">Cancel</button>
+      <button class="btn btn-active" type="button" id="appDialogConfirm">OK</button>
+    </div>
+  </div>
+</div>
+
 <script>
-const API_BASE = `http://${window.location.hostname}:5173`;
+const API_BASE = `http://adsb-feeder.local:5173`;
 const API = {
   mil: `${API_BASE}/api/stats/interesting/military`,
   gov: `${API_BASE}/api/stats/interesting/government`,
@@ -928,8 +988,13 @@ const API = {
 };
 const REFRESH_INTERVAL = 60000;
 const FETCH_TIMEOUT = 10000;
+const IMPORT_STORAGE_KEY = 'adsbdisplay.importedSnapshot.v1';
+const PLANE_IMAGES_URL = 'https://raw.githubusercontent.com/sdr-enthusiasts/plane-alert-db/refs/heads/main/plane_images.csv';
+const PLANE_ALERT_DB_URL = 'https://raw.githubusercontent.com/sdr-enthusiasts/plane-alert-db/refs/heads/main/plane-alert-db.csv';
 
 let data = { mil: [], gov: [], civ: [] };
+let receiverData = { mil: [], gov: [], civ: [] };
+let importedBackups = { mil: [], gov: [], civ: [] };
 let activeSection = 'mil';
 let view = 'grid';
 let activeCategories = new Set();
@@ -943,6 +1008,8 @@ let inFlight = false;
 let pollTimer = null;
 let modalHex = null;
 let pendingRender = false;
+let appDialogResolve = null;
+let appDialogCanCancel = false;
 
 const SORT_MAP = {
   'seen_desc':    { key: 'seen',     dir: 'desc' },
@@ -958,8 +1025,97 @@ function sortSelectValue() {
   return '';
 }
 
+function closeAppDialog(result) {
+  if (!appDialogResolve) return;
+  const overlay = document.getElementById('appDialog');
+  overlay.classList.remove('open');
+  overlay.setAttribute('aria-hidden', 'true');
+  const resolve = appDialogResolve;
+  appDialogResolve = null;
+  appDialogCanCancel = false;
+  resolve(result);
+}
+
+function appDialog({ title, message, confirmLabel = 'OK', cancelLabel = '' }) {
+  return new Promise(resolve => {
+    const overlay = document.getElementById('appDialog');
+    const cancel = document.getElementById('appDialogCancel');
+    const confirm = document.getElementById('appDialogConfirm');
+
+    document.getElementById('appDialogTitle').textContent = title;
+    document.getElementById('appDialogMessage').textContent = message;
+    confirm.textContent = confirmLabel;
+    cancel.textContent = cancelLabel;
+    cancel.hidden = !cancelLabel;
+    appDialogResolve = resolve;
+    appDialogCanCancel = Boolean(cancelLabel);
+
+    overlay.classList.add('open');
+    overlay.setAttribute('aria-hidden', 'false');
+    confirm.focus();
+  });
+}
+
+function appConfirm(title, message, confirmLabel = 'Pull', cancelLabel = 'Skip') {
+  return appDialog({ title, message, confirmLabel, cancelLabel });
+}
+
+function appAlert(title, message) {
+  return appDialog({ title, message, confirmLabel: 'OK' });
+}
+
 function allPlanes() {
   return data[activeSection];
+}
+
+function updateSectionCounts() {
+  document.getElementById('milCount').textContent = data.mil.length;
+  document.getElementById('govCount').textContent = data.gov.length;
+  document.getElementById('civCount').textContent = data.civ.length;
+}
+
+function backupCount() {
+  return importedBackups.mil.length + importedBackups.gov.length + importedBackups.civ.length;
+}
+
+function setSourceMode() {
+  const count = backupCount();
+  document.getElementById('sourcePill').innerHTML = count
+    ? `<span class="live-dot"></span> Live + ${count} backup`
+    : '<span class="live-dot"></span> Live';
+}
+
+function valueOrFallback(value, fallback) {
+  return value === undefined || value === null || value === '' ? fallback : value;
+}
+
+function mergePlane(live, backup) {
+  if (!live) return backup;
+  if (!backup) return live;
+  const merged = { ...backup, ...live };
+  [
+    'type','operator','flight','registration','icao_type','category','group',
+    'tag1','tag2','tag3','image_link_1','image_link_2','image_link_3','image_link_4','seen','seen_epoch'
+  ].forEach(key => {
+    merged[key] = valueOrFallback(live[key], backup[key]);
+  });
+  return merged;
+}
+
+function mergeSection(live, backups) {
+  const byHex = new Map();
+  live.forEach(p => byHex.set(p.hex, p));
+  backups.forEach(p => byHex.set(p.hex, mergePlane(byHex.get(p.hex), p)));
+  return [...byHex.values()].sort((a, b) => (b.seen_epoch || 0) - (a.seen_epoch || 0));
+}
+
+function refreshMergedData() {
+  data = {
+    mil: mergeSection(receiverData.mil, importedBackups.mil),
+    gov: mergeSection(receiverData.gov, importedBackups.gov),
+    civ: mergeSection(receiverData.civ, importedBackups.civ)
+  };
+  setSourceMode();
 }
 
 async function fetchSection(section, signal, cacheBust) {
@@ -1007,27 +1163,24 @@ async function fetchAll(manual) {
       fetchSection('civ', controller.signal, manual),
     ]);
 
+    receiverData = { mil, gov, civ };
+    refreshMergedData();
+
     const newSig = {
-      mil: computeSignature(mil),
-      gov: computeSignature(gov),
-      civ: computeSignature(civ),
+      mil: computeSignature(data.mil),
+      gov: computeSignature(data.gov),
+      civ: computeSignature(data.civ),
     };
     const changed = newSig.mil !== dataSig.mil
                  || newSig.gov !== dataSig.gov
                  || newSig.civ !== dataSig.civ;
 
-    diffHexes('mil', mil);
-    diffHexes('gov', gov);
-    diffHexes('civ', civ);
-
-    data.mil = mil;
-    data.gov = gov;
-    data.civ = civ;
+    diffHexes('mil', data.mil);
+    diffHexes('gov', data.gov);
+    diffHexes('civ', data.civ);
     dataSig = newSig;
 
-    document.getElementById('milCount').textContent = mil.length;
-    document.getElementById('govCount').textContent = gov.length;
-    document.getElementById('civCount').textContent = civ.length;
+    updateSectionCounts();
     updateStats();
     buildCategoryChips();
 
@@ -1075,7 +1228,7 @@ function preservingScroll(fn) {
 function updateStats() {
   const planes = allPlanes();
   document.getElementById('countPill').textContent = `${planes.length} aircraft`;
-  document.getElementById('updatedPill').textContent = `Updated ${new Date().toLocaleTimeString()}`;
+  document.getElementById('updatedPill').textContent = `Updated ${formatTime(new Date())}`;
 }
 
 function switchSection(section) {
@@ -1214,8 +1367,29 @@ function freshClass(epoch) {
   return 'fresh-stale';
 }
 
+function formatTime(date) {
+  return date.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+}
+
+function formatDateTime(date) {
+  return date.toLocaleString([], {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+}
+
 function getImages(p) {
-  return [p.image_link_1, p.image_link_2, p.image_link_3].filter(Boolean);
+  return [p.image_link_1, p.image_link_2, p.image_link_3, p.image_link_4].filter(Boolean);
 }
 
 function datestamp() {
@@ -1241,9 +1415,10 @@ function exportFilename(ext) {
 }
 
 function exportCSV() {
+  const baseFields = ['hex','type','operator','flight','registration','icao_type','category','group','image_link_1','image_link_2','image_link_3','image_link_4','seen','seen_epoch'];
   const fields = exportIncludesTags()
-    ? ['hex','type','operator','flight','registration','icao_type','category','group','tag1','tag2','tag3','seen']
-    : ['hex','type','operator','flight','registration','icao_type','category','group','seen'];
+    ? [...baseFields.slice(0, 8), 'tag1','tag2','tag3', ...baseFields.slice(8)]
+    : baseFields;
   const header = fields.join(',');
   const rows = getFiltered().map(p =>
     fields.map(f => {
@@ -1264,6 +1439,336 @@ function exportJSON() {
     exportFilename('json'),
     'application/json'
   );
+}
+
+function parseCSV(text) {
+  const rows = [];
+  let row = [];
+  let value = '';
+  let quoted = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const next = text[i + 1];
+
+    if (quoted) {
+      if (ch === '"' && next === '"') {
+        value += '"';
+        i++;
+      } else if (ch === '"') {
+        quoted = false;
+      } else {
+        value += ch;
+      }
+    } else if (ch === '"') {
+      quoted = true;
+    } else if (ch === ',') {
+      row.push(value);
+      value = '';
+    } else if (ch === '\n') {
+      row.push(value);
+      rows.push(row);
+      row = [];
+      value = '';
+    } else if (ch !== '\r') {
+      value += ch;
+    }
+  }
+
+  if (value || row.length) {
+    row.push(value);
+    rows.push(row);
+  }
+  if (!rows.length) return [];
+
+  const headers = rows.shift().map(h => h.trim());
+  return rows
+    .filter(r => r.some(v => v.trim()))
+    .map(r => Object.fromEntries(headers.map((h, i) => [h, r[i] ?? ''])));
+}
+
+function sectionFromImportFilename(filename) {
+  const match = filename.toLowerCase().match(/aircraft-(mil|gov|civ)-/);
+  return match ? match[1] : activeSection;
+}
+
+function parseImport(text, filename) {
+  const trimmed = text.trim();
+  if (!trimmed) throw new Error('File is empty');
+  const targetSection = sectionFromImportFilename(filename);
+
+  if (filename.toLowerCase().endsWith('.json') || trimmed.startsWith('[') || trimmed.startsWith('{')) {
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed[targetSection])) return parsed[targetSection];
+    throw new Error('JSON import must be an exported aircraft array');
+  }
+
+  return parseCSV(text);
+}
+
+function normalizeGroup(group, fallbackSection) {
+  const g = String(group || fallbackSection).toLowerCase();
+  if (g.startsWith('gov')) return 'gov';
+  if (g.startsWith('civ')) return 'civ';
+  if (g.startsWith('mil')) return 'mil';
+  if (g.startsWith('pol')) return 'gov';
+  return fallbackSection;
+}
+
+function normalizeImportedPlane(item, fallbackSection) {
+  item = item && typeof item === 'object' ? item : {};
+  const value = (key) => String(item[key] ?? '').trim();
+  const epoch = Number(item.seen_epoch);
+  const seenDate = Number.isFinite(epoch) && epoch > 0
+    ? new Date(epoch * 1000)
+    : new Date(value('seen') || Date.now());
+  const validSeen = Number.isNaN(seenDate.getTime()) ? new Date() : seenDate;
+  const hex = value('hex') || value('icao');
+
+  return {
+    ...item,
+    hex,
+    icao: value('icao') || hex,
+    type: value('type'),
+    operator: value('operator'),
+    flight: value('flight'),
+    registration: value('registration'),
+    icao_type: value('icao_type'),
+    category: value('category') || 'Imported',
+    group: normalizeGroup(value('group'), fallbackSection),
+    tag1: value('tag1'),
+    tag2: value('tag2'),
+    tag3: value('tag3'),
+    seen: value('seen') || validSeen.toISOString(),
+    seen_epoch: Math.floor(validSeen.getTime() / 1000),
+    image_link_1: value('image_link_1'),
+    image_link_2: value('image_link_2'),
+    image_link_3: value('image_link_3'),
+    image_link_4: value('image_link_4')
+  };
+}
+
+async function fetchPlaneImageIndex() {
+  const res = await fetch(PLANE_IMAGES_URL);
+  if (!res.ok) throw new Error(`Image database returned HTTP ${res.status}`);
+  const rows = parseCSV(await res.text());
+  const index = new Map();
+
+  rows.forEach(row => {
+    const hex = String(row.$ICAO || row.ICAO || '').trim().toUpperCase();
+    const links = [
+      row['#ImageLink'],
+      row['#ImageLink2'],
+      row['#ImageLink3'],
+      row['#ImageLink4']
+    ].map(v => String(v || '').trim()).filter(Boolean);
+    if (hex && links.length) index.set(hex, links);
+  });
+
+  return index;
+}
+
+function applyImageLookup(planes, imageIndex) {
+  let filled = 0;
+  planes.forEach(p => {
+    if (getImages(p).length > 0) return;
+    const links = imageIndex.get(String(p.hex || p.icao || '').trim().toUpperCase());
+    if (!links || !links.length) return;
+    p.image_link_1 = links[0] || '';
+    p.image_link_2 = links[1] || '';
+    p.image_link_3 = links[2] || '';
+    p.image_link_4 = links[3] || '';
+    filled++;
+  });
+  return filled;
+}
+
+function hasTags(p) {
+  return Boolean(p.tag1 || p.tag2 || p.tag3);
+}
+
+async function fetchPlaneTagIndex() {
+  const res = await fetch(PLANE_ALERT_DB_URL);
+  if (!res.ok) throw new Error(`Tag database returned HTTP ${res.status}`);
+  const rows = parseCSV(await res.text());
+  const index = new Map();
+
+  rows.forEach(row => {
+    const hex = String(row.$ICAO || row.ICAO || '').trim().toUpperCase();
+    if (!hex) return;
+    index.set(hex, {
+      registration: String(row.$Registration || '').trim(),
+      operator: String(row.$Operator || '').trim(),
+      type: String(row.$Type || '').trim(),
+      icao_type: String(row['$ICAO Type'] || '').trim(),
+      group: String(row['#CMPG'] || '').trim(),
+      tag1: String(row['$Tag 1'] || '').trim(),
+      tag2: String(row['$#Tag 2'] || '').trim(),
+      tag3: String(row['$#Tag 3'] || '').trim(),
+      category: String(row.Category || '').trim(),
+      link: String(row['$#Link'] || '').trim()
+    });
+  });
+
+  return index;
+}
+
+function applyTagLookup(planes, tagIndex, fallbackSection) {
+  let filled = 0;
+  planes.forEach(p => {
+    if (hasTags(p)) return;
+    const info = tagIndex.get(String(p.hex || p.icao || '').trim().toUpperCase());
+    if (!info || !(info.tag1 || info.tag2 || info.tag3)) return;
+
+    p.tag1 = valueOrFallback(p.tag1, info.tag1);
+    p.tag2 = valueOrFallback(p.tag2, info.tag2);
+    p.tag3 = valueOrFallback(p.tag3, info.tag3);
+    p.category = p.category && p.category !== 'Imported' ? p.category : (info.category || p.category);
+    p.group = valueOrFallback(p.group, normalizeGroup(info.group, fallbackSection));
+    p.registration = valueOrFallback(p.registration, info.registration);
+    p.operator = valueOrFallback(p.operator, info.operator);
+    p.type = valueOrFallback(p.type, info.type);
+    p.icao_type = valueOrFallback(p.icao_type, info.icao_type);
+    p.link = valueOrFallback(p.link, info.link);
+    filled++;
+  });
+  return filled;
+}
+
+function upsertBackup(section, plane) {
+  const list = importedBackups[section];
+  const idx = list.findIndex(p => p.hex === plane.hex);
+  if (idx >= 0) {
+    list[idx] = mergePlane(plane, list[idx]);
+  } else {
+    list.push(plane);
+  }
+}
+
+function saveImportedSnapshot(section, filename) {
+  try {
+    localStorage.setItem(IMPORT_STORAGE_KEY, JSON.stringify({
+      version: 2,
+      section,
+      filename,
+      savedAt: new Date().toISOString(),
+      backups: importedBackups
+    }));
+    return true;
+  } catch (err) {
+    console.warn('Could not persist imported aircraft snapshot', err);
+    return false;
+  }
+}
+
+function clearImportedSnapshot() {
+  try {
+    localStorage.removeItem(IMPORT_STORAGE_KEY);
+  } catch (err) {
+    console.warn('Could not clear imported aircraft snapshot', err);
+  }
+}
+
+function loadImportedSnapshot() {
+  let snapshot;
+  try {
+    snapshot = JSON.parse(localStorage.getItem(IMPORT_STORAGE_KEY) || 'null');
+  } catch (err) {
+    clearImportedSnapshot();
+    return false;
+  }
+  if (!snapshot || ![1, 2].includes(snapshot.version)) return false;
+
+  const source = snapshot.version === 2 ? snapshot.backups : snapshot.data;
+  if (!source) return false;
+
+  importedBackups = {
+    mil: Array.isArray(source.mil) ? source.mil : [],
+    gov: Array.isArray(source.gov) ? source.gov : [],
+    civ: Array.isArray(source.civ) ? source.civ : []
+  };
+  activeSection = ['mil','gov','civ'].includes(snapshot.section) ? snapshot.section : activeSection;
+  refreshMergedData();
+  newHexes = { mil: new Set(), gov: new Set(), civ: new Set() };
+  updateSectionCounts();
+  switchSection(activeSection);
+  document.getElementById('updatedPill').textContent =
+    `Loaded ${backupCount()} backup aircraft`;
+  return true;
+}
+
+async function importAircraft(items, filename) {
+  const targetSection = sectionFromImportFilename(filename);
+  const imported = items
+    .map(item => normalizeImportedPlane(item, targetSection))
+    .filter(p => p.hex);
+  if (!imported.length) throw new Error('No aircraft rows with a hex/ICAO value were found');
+
+  const missingImages = imported.filter(p => getImages(p).length === 0);
+  const missingTags = imported.filter(p => !hasTags(p));
+  let filledImages = 0;
+  let filledTags = 0;
+  if (missingImages.length && await appConfirm(
+    'Pull Missing Images?',
+    `${missingImages.length} imported aircraft have no images.\n\nPull matching image links from plane-alert-db?`
+  )) {
+    try {
+      document.getElementById('updatedPill').textContent = 'Pulling backup images...';
+      filledImages = applyImageLookup(imported, await fetchPlaneImageIndex());
+    } catch (err) {
+      await appAlert(
+        'Could Not Pull Images',
+        `Could not pull backup images: ${err.message}\n\nImporting aircraft without extra images.`
+      );
+    }
+  }
+  if (missingTags.length && await appConfirm(
+    'Pull Missing Tags?',
+    `${missingTags.length} imported aircraft have no tags.\n\nPull matching tags and metadata from plane-alert-db?`
+  )) {
+    try {
+      document.getElementById('updatedPill').textContent = 'Pulling backup tags...';
+      filledTags = applyTagLookup(imported, await fetchPlaneTagIndex(), targetSection);
+    } catch (err) {
+      await appAlert(
+        'Could Not Pull Tags',
+        `Could not pull backup tags: ${err.message}\n\nImporting aircraft without extra tags.`
+      );
+    }
+  }
+
+  activeCategories.clear();
+  imported.forEach(p => upsertBackup(targetSection, p));
+  refreshMergedData();
+  const currentSet = new Set(data[targetSection].map(p => p.hex));
+  const prev = prevHexes[targetSection] || new Set();
+  newHexes[targetSection] = new Set(imported.map(p => p.hex).filter(hex => !prev.has(hex)));
+  prevHexes[targetSection] = currentSet;
+  dataSig[targetSection] = computeSignature(data[targetSection]);
+  imageIndices = {};
+
+  updateSectionCounts();
+  if (targetSection !== activeSection) {
+    switchSection(targetSection);
+  } else {
+    updateStats();
+    buildCategoryChips();
+    preservingScroll(render);
+  }
+  const persisted = saveImportedSnapshot(targetSection, filename);
+  const enrichSummary = [
+    filledImages ? `pulled ${filledImages} image sets` : '',
+    filledTags ? `pulled ${filledTags} tag sets` : ''
+  ].filter(Boolean).join(', ');
+  document.getElementById('updatedPill').textContent =
+    `Added ${imported.length} backup aircraft${enrichSummary ? `, ${enrichSummary}` : ''} from ${filename}${persisted ? '' : ' (not saved)'}`;
+}
+
+async function importFile(file) {
+  const text = await file.text();
+  const items = parseImport(text, file.name);
+  await importAircraft(items, file.name);
 }
 
 function groupBadge(p) {
@@ -1323,7 +1828,7 @@ function renderGrid(items) {
         </div>
         <div class="card-seen">
           <span><span class="freshness ${freshClass(p.seen_epoch)}"></span>${timeAgo(p.seen_epoch)}</span>
-          <span>${esc(new Date(p.seen).toLocaleString())}</span>
+          <span>${esc(formatDateTime(new Date(p.seen)))}</span>
         </div>
       </div>
     </div>`;
@@ -1417,9 +1922,12 @@ function openModal(hex) {
   document.getElementById('modalOperator').textContent = `${p.operator}${p.flight ? ' — ' + p.flight : ''}`;
 
   const thumbs = document.getElementById('modalThumbs');
-  thumbs.innerHTML = imgs.map((url, i) =>
-    `<img src="${encodeURI(url)}" class="${i === 0 ? 'selected' : ''}" data-url="${esc(url)}" onerror="this.style.display='none'">`
-  ).join('');
+  thumbs.hidden = imgs.length <= 1;
+  thumbs.innerHTML = imgs.length > 1
+    ? imgs.map((url, i) =>
+      `<img src="${encodeURI(url)}" class="${i === 0 ? 'selected' : ''}" data-url="${esc(url)}" onerror="this.style.display='none'">`
+    ).join('')
+    : '';
 
   const grid = document.getElementById('modalGrid');
   grid.innerHTML = `
@@ -1436,7 +1944,7 @@ function openModal(hex) {
 
   document.getElementById('modalSeen').innerHTML = `
     <span><span class="freshness ${freshClass(p.seen_epoch)}"></span>${timeAgo(p.seen_epoch)}</span>
-    <span>${esc(new Date(p.seen).toLocaleString())}</span>
+    <span>${esc(formatDateTime(new Date(p.seen)))}</span>
   `;
 
   modalHex = hex;
@@ -1465,6 +1973,10 @@ function closeModal(e) {
 }
 
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && appDialogResolve && appDialogCanCancel) {
+    closeAppDialog(false);
+    return;
+  }
   if (e.key === 'Escape' && document.getElementById('modal').classList.contains('open')) {
     closeModal();
   }
@@ -1513,8 +2025,30 @@ document.querySelectorAll('.view-toggle .btn').forEach(btn => {
 // Refresh
 document.getElementById('btnRefresh').addEventListener('click', () => {
   if (inFlight) return;
+  setSourceMode();
   fetchAll(true);
+  startPolling();
 });
+
+// Import
+document.getElementById('btnImport').addEventListener('click', () => {
+  document.getElementById('importFile').click();
+});
+document.getElementById('importFile').addEventListener('change', async (e) => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+
+  try {
+    await importFile(file);
+  } catch (err) {
+    document.getElementById('updatedPill').textContent = 'Import failed';
+    await appAlert('Import Failed', err.message);
+  }
+});
+
+document.getElementById('appDialogCancel').addEventListener('click', () => closeAppDialog(false));
+document.getElementById('appDialogConfirm').addEventListener('click', () => closeAppDialog(true));
 
 // Export dropdown
 const exportDrop = document.getElementById('exportDrop');
@@ -1642,6 +2176,7 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+loadImportedSnapshot();
 fetchAll(false);
 startPolling();
 </script>
