@@ -202,6 +202,9 @@
     border-color: var(--accent);
   }
 
+  /* Backend button: text on desktop, icon-only on mobile. */
+  #btnBackend .btn-icon-only-mobile { display: none; vertical-align: middle; }
+
   /* Filter chips */
   .chip-row {
     display: flex;
@@ -592,6 +595,11 @@
     select { flex: 1; min-width: 0; padding: 7px 8px; font-size: 0.78rem; }
     .btn { padding: 7px 10px; font-size: 0.78rem; }
 
+    /* Stopgap: shrink Backend to icon-only on mobile so the toolbar fits. */
+    #btnBackend { padding: 7px 8px; }
+    #btnBackend .btn-label-desktop { display: none; }
+    #btnBackend .btn-icon-only-mobile { display: inline-block; }
+
     /* Collapsible wrapper — animate the whole bottom block as one unit.
        Uses a CSS variable for measured height so the transition is smooth
        and predictable instead of fighting with max-height: 0. */
@@ -948,7 +956,10 @@
         </button>
       </div>
       <button class="btn" id="btnRefresh">Refresh</button>
-      <button class="btn" id="btnBackend" title="Change SkyStats backend URL (for Tailscale or remote access)">Backend</button>
+      <button class="btn" id="btnBackend" title="Change SkyStats backend URL (for Tailscale or remote access)" aria-label="Change backend URL">
+        <svg class="btn-icon-only-mobile" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 1.5a1.2 1.2 0 0 0-1.18.99l-.18 1.06a5.5 5.5 0 0 0-1.1.64l-1-.4a1.2 1.2 0 0 0-1.42.52l-.78 1.34a1.2 1.2 0 0 0 .25 1.49l.82.7a5.5 5.5 0 0 0 0 1.32l-.82.7a1.2 1.2 0 0 0-.25 1.49l.78 1.34a1.2 1.2 0 0 0 1.42.52l1-.4c.34.25.7.46 1.1.64l.18 1.06A1.2 1.2 0 0 0 8 14.5a1.2 1.2 0 0 0 1.18-.99l.18-1.06c.4-.18.76-.39 1.1-.64l1 .4a1.2 1.2 0 0 0 1.42-.52l.78-1.34a1.2 1.2 0 0 0-.25-1.49l-.82-.7a5.5 5.5 0 0 0 0-1.32l.82-.7a1.2 1.2 0 0 0 .25-1.49l-.78-1.34a1.2 1.2 0 0 0-1.42-.52l-1 .4a5.5 5.5 0 0 0-1.1-.64l-.18-1.06A1.2 1.2 0 0 0 8 1.5Zm0 4.25a2.25 2.25 0 1 1 0 4.5 2.25 2.25 0 0 1 0-4.5Z"/></svg>
+        <span class="btn-label-desktop">Backend</span>
+      </button>
       <button class="btn" id="btnImport" title="Import CSV or JSON export">Import</button>
       <input class="file-input" type="file" id="importFile" accept=".csv,.json,text/csv,application/json">
       <div class="export-wrap" id="exportWrap">
