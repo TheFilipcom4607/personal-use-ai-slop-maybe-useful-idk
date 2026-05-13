@@ -54,3 +54,13 @@ The backend defaults to returning only 5 planes, so you need to change that befo
 ```
 
 7. Send the request. If it succeeds, you're all set.
+
+## Accessing over Tailscale (or remote networks)
+
+By default, the GUI talks to the SkyStats backend at the same hostname the page was loaded from, on port `5173`. So if you open the GUI via your feeder's Tailscale hostname (or its tailnet IP), the API calls automatically go over Tailscale too — no extra configuration needed, as long as port `5173` is reachable on that host over the tailnet.
+
+If your setup needs a different backend address (for example, the GUI is hosted on a different machine than the feeder, or you're proxying SkyStats through Tailscale Serve), click the **Backend** button in the toolbar and enter the full URL (e.g. `http://my-feeder.tailnet-name.ts.net:5173` or `https://feeder.tailnet-name.ts.net`). The value is stored in your browser's local storage and used for all subsequent requests. Click *Reset to default* to go back to the automatic behavior.
+
+If the GUI loads but the aircraft list doesn't, the error message will include a *Change backend URL* button that opens the same dialog.
+
+Note: if you access the GUI over HTTPS (e.g. via Tailscale Serve with TLS), the backend URL also needs to be HTTPS — browsers block mixed HTTP/HTTPS requests.
