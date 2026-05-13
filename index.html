@@ -879,6 +879,28 @@
     justify-content: flex-end;
     gap: 8px;
     margin-top: 18px;
+    flex-wrap: wrap;
+  }
+
+  .backend-input {
+    width: 100%;
+    margin-top: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.9rem;
+    box-sizing: border-box;
+  }
+
+  .backend-hint {
+    margin-top: 8px;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    white-space: normal;
+    word-break: break-all;
   }
 </style>
 </head>
@@ -926,6 +948,7 @@
         </button>
       </div>
       <button class="btn" id="btnRefresh">Refresh</button>
+      <button class="btn" id="btnBackend" title="Change SkyStats backend URL (for Tailscale or remote access)">Backend</button>
       <button class="btn" id="btnImport" title="Import CSV or JSON export">Import</button>
       <input class="file-input" type="file" id="importFile" accept=".csv,.json,text/csv,application/json">
       <div class="export-wrap" id="exportWrap">
@@ -979,13 +1002,68 @@
   </div>
 </div>
 
+<div class="app-dialog-overlay" id="backendDialog" aria-hidden="true">
+  <div class="app-dialog" role="dialog" aria-modal="true" aria-labelledby="backendDialogTitle">
+    <h2 id="backendDialogTitle">SkyStats backend URL</h2>
+    <p>Address of the SkyStats backend. Leave blank to use the default for the hostname this page was loaded from. Useful when accessing the GUI over Tailscale or from a different machine than the feeder.</p>
+    <input type="text" id="backendDialogInput" class="backend-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <div class="backend-hint" id="backendDialogDefault"></div>
+    <div class="app-dialog-actions">
+      <button class="btn" type="button" id="backendDialogCancel">Cancel</button>
+      <button class="btn" type="button" id="backendDialogReset">Reset to default</button>
+      <button class="btn btn-active" type="button" id="backendDialogSave">Save</button>
+    </div>
+  </div>
+</div>
+
 <script>
-const API_BASE = `http://adsb-feeder.local:5173`;
+const DEFAULT_API_PORT = 5173;
+const FALLBACK_API_BASE = `http://adsb-feeder.local:${DEFAULT_API_PORT}`;
+const API_BASE_STORAGE_KEY = 'adsbdisplay.apiBase.v1';
+
+function normalizeApiBase(value) {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim().replace(/\/+$/, '');
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `http://${trimmed}`;
+}
+
+function loadStoredApiBase() {
+  try { return normalizeApiBase(localStorage.getItem(API_BASE_STORAGE_KEY) || ''); }
+  catch (_) { return ''; }
+}
+
+function storeApiBase(value) {
+  try {
+    if (value) localStorage.setItem(API_BASE_STORAGE_KEY, value);
+    else localStorage.removeItem(API_BASE_STORAGE_KEY);
+  } catch (_) {}
+}
+
+// Default to the same host the page was loaded from, so accessing the GUI over
+// Tailscale (or any non-mDNS hostname) also reaches the SkyStats backend over
+// the same network path. Falls back to the mDNS name for file:// usage.
+function defaultApiBase() {
+  const loc = window.location;
+  if (loc && (loc.protocol === 'http:' || loc.protocol === 'https:') && loc.hostname) {
+    return `${loc.protocol}//${loc.hostname}:${DEFAULT_API_PORT}`;
+  }
+  return FALLBACK_API_BASE;
+}
+
+let API_BASE = loadStoredApiBase() || defaultApiBase();
 const API = {
-  mil: `${API_BASE}/api/stats/interesting/military`,
-  gov: `${API_BASE}/api/stats/interesting/government`,
-  civ: `${API_BASE}/api/stats/interesting/civilian`,
+  mil: '',
+  gov: '',
+  civ: '',
 };
+function rebuildApi() {
+  API.mil = `${API_BASE}/api/stats/interesting/military`;
+  API.gov = `${API_BASE}/api/stats/interesting/government`;
+  API.civ = `${API_BASE}/api/stats/interesting/civilian`;
+}
+rebuildApi();
 const REFRESH_INTERVAL = 60000;
 const FETCH_TIMEOUT = 10000;
 const IMPORT_STORAGE_KEY = 'adsbdisplay.importedSnapshot.v1';
@@ -1198,13 +1276,15 @@ async function fetchAll(manual) {
       if (controller !== currentController) return;
       if (document.visibilityState === 'hidden') return;
       document.getElementById('content').innerHTML =
-        `<div class="status-msg error-msg">Request timed out.<br><br><button class="btn" id="retryBtn">Retry</button></div>`;
-      document.getElementById('retryBtn').addEventListener('click', () => fetchAll(true));
+        `<div class="status-msg error-msg">Request timed out reaching ${esc(API_BASE)}.<br><br><button class="btn" id="retryBtn">Retry</button> <button class="btn" id="backendBtnErr">Change backend URL</button></div>`;
     } else {
       document.getElementById('content').innerHTML =
-        `<div class="status-msg error-msg">Failed to load data: ${esc(e.message)}<br><br><button class="btn" id="retryBtn">Retry</button></div>`;
-      document.getElementById('retryBtn').addEventListener('click', () => fetchAll(true));
+        `<div class="status-msg error-msg">Failed to load data from ${esc(API_BASE)}: ${esc(e.message)}<br><br><button class="btn" id="retryBtn">Retry</button> <button class="btn" id="backendBtnErr">Change backend URL</button></div>`;
     }
+    const retryBtn = document.getElementById('retryBtn');
+    if (retryBtn) retryBtn.addEventListener('click', () => fetchAll(true));
+    const backendBtnErr = document.getElementById('backendBtnErr');
+    if (backendBtnErr) backendBtnErr.addEventListener('click', openBackendDialog);
   } finally {
     clearTimeout(timeoutId);
     if (controller === currentController) {
@@ -1973,6 +2053,10 @@ function closeModal(e) {
 }
 
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('backendDialog').classList.contains('open')) {
+    closeBackendDialog();
+    return;
+  }
   if (e.key === 'Escape' && appDialogResolve && appDialogCanCancel) {
     closeAppDialog(false);
     return;
@@ -2049,6 +2133,51 @@ document.getElementById('importFile').addEventListener('change', async (e) => {
 
 document.getElementById('appDialogCancel').addEventListener('click', () => closeAppDialog(false));
 document.getElementById('appDialogConfirm').addEventListener('click', () => closeAppDialog(true));
+
+// Backend URL dialog
+function openBackendDialog() {
+  const overlay = document.getElementById('backendDialog');
+  const input = document.getElementById('backendDialogInput');
+  const hint = document.getElementById('backendDialogDefault');
+  input.value = loadStoredApiBase() || '';
+  input.placeholder = defaultApiBase();
+  hint.textContent = `Default for this page: ${defaultApiBase()} • Currently using: ${API_BASE}`;
+  overlay.classList.add('open');
+  overlay.setAttribute('aria-hidden', 'false');
+  setTimeout(() => input.focus(), 0);
+}
+
+function closeBackendDialog() {
+  const overlay = document.getElementById('backendDialog');
+  overlay.classList.remove('open');
+  overlay.setAttribute('aria-hidden', 'true');
+}
+
+function applyBackendBase(newBase) {
+  API_BASE = newBase;
+  rebuildApi();
+  fetchAll(true);
+}
+
+document.getElementById('btnBackend').addEventListener('click', openBackendDialog);
+document.getElementById('backendDialogCancel').addEventListener('click', closeBackendDialog);
+document.getElementById('backendDialogReset').addEventListener('click', () => {
+  storeApiBase('');
+  closeBackendDialog();
+  applyBackendBase(defaultApiBase());
+});
+document.getElementById('backendDialogSave').addEventListener('click', () => {
+  const normalized = normalizeApiBase(document.getElementById('backendDialogInput').value);
+  storeApiBase(normalized);
+  closeBackendDialog();
+  applyBackendBase(normalized || defaultApiBase());
+});
+document.getElementById('backendDialog').addEventListener('click', (e) => {
+  if (e.target.id === 'backendDialog') closeBackendDialog();
+});
+document.getElementById('backendDialogInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('backendDialogSave').click(); }
+});
 
 // Export dropdown
 const exportDrop = document.getElementById('exportDrop');
