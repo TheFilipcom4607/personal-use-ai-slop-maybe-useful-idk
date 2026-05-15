@@ -1,0 +1,6 @@
+# Local sidecar dev data — only used when running the Flask app from this dir.
+.localdata/
+
+# Python
+__pycache__/
+*.pyc

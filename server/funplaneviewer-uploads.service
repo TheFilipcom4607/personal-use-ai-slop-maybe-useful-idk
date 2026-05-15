@@ -1,0 +1,34 @@
+[Unit]
+Description=FunPlaneViewer uploads sidecar (manual images + backup snapshots)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Run as a low-privilege user. Create with:
+#   sudo useradd --system --no-create-home --shell /usr/sbin/nologin funplaneviewer
+User=funplaneviewer
+Group=funplaneviewer
+
+# Adjust paths if you installed somewhere other than /opt/funplaneviewer.
+Environment=FUNPLANEVIEWER_DATA_DIR=/opt/funplaneviewer/data
+Environment=HOST=127.0.0.1
+Environment=PORT=5174
+WorkingDirectory=/opt/funplaneviewer/server
+
+# python3 with Flask installed system-wide, in a venv, or via pipx.
+# If you use a venv, point this at /opt/funplaneviewer/venv/bin/python.
+ExecStart=/usr/bin/python3 /opt/funplaneviewer/server/funplaneviewer_uploads.py
+
+Restart=on-failure
+RestartSec=3
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/funplaneviewer/data
+
+[Install]
+WantedBy=multi-user.target
