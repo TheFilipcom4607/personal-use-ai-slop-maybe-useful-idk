@@ -853,6 +853,11 @@
 
   .app-dialog-overlay.open { display: flex; }
 
+  /* Choose-dialog is always shown on top of any other open dialog (e.g. the
+     manual-image menu, which stays open in the background while the user
+     picks Local vs Server). */
+  #appChooseDialog { z-index: 10010; }
+
   .app-dialog {
     width: min(420px, 100%);
     background: var(--surface);
@@ -939,6 +944,14 @@
     margin: 18px 0 0;
     border: none;
     border-top: 1px solid var(--border);
+  }
+
+  .manual-image-jetphotos-row {
+    margin-top: 8px;
+  }
+  .manual-image-jetphotos-row .btn[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .backend-input {
@@ -1078,6 +1091,9 @@
 
     <label for="manualImageHex">ICAO hex</label>
     <input type="text" id="manualImageHex" maxlength="8" autocomplete="off" placeholder="A1B2C3">
+    <div class="manual-image-jetphotos-row">
+      <button class="btn" type="button" id="manualImageJetphotos" disabled title="Open JetPhotos search for this aircraft's registration">Search JetPhotos for <span id="manualImageJetphotosReg">registration</span></button>
+    </div>
 
     <label>Image links</label>
     <div class="manual-image-links">
@@ -1822,6 +1838,19 @@ function fillManualImageFields(hex) {
   document.getElementById('manualImageHex').value = normalizedHex;
   fields.forEach((field, i) => { field.value = values[i] || ''; });
   document.getElementById('manualImageRemove').disabled = !source;
+
+  const jpBtn = document.getElementById('manualImageJetphotos');
+  const jpReg = document.getElementById('manualImageJetphotosReg');
+  const reg = (p && p.registration ? String(p.registration).trim() : '');
+  if (reg) {
+    jpBtn.disabled = false;
+    jpReg.textContent = reg;
+    jpBtn.dataset.reg = reg;
+  } else {
+    jpBtn.disabled = true;
+    jpReg.textContent = 'registration';
+    delete jpBtn.dataset.reg;
+  }
 
   let suffix = '';
   if (source === 'local') suffix = ' - using local override';
@@ -2770,6 +2799,12 @@ document.getElementById('manualImageMenu').addEventListener('click', (e) => {
 document.getElementById('manualImageBackend').addEventListener('click', () => {
   closeManualImageMenu();
   openBackendDialog();
+});
+document.getElementById('manualImageJetphotos').addEventListener('click', (e) => {
+  const reg = e.currentTarget.dataset.reg;
+  if (!reg) return;
+  const url = `https://www.jetphotos.com/showphotos.php?keywords-type=reg&keywords=${encodeURIComponent(reg)}&search-type=Advanced&keywords-contain=0&sort-order=4`;
+  window.open(url, '_blank', 'noopener,noreferrer');
 });
 
 // Export dropdown
