@@ -2814,7 +2814,7 @@ document.getElementById('manualImageJetphotos').addEventListener('click', (e) =>
 document.getElementById('manualImageGoogle').addEventListener('click', (e) => {
   const hex = e.currentTarget.dataset.hex;
   if (!hex) return;
-  const url = `https://www.google.com/search?q=${encodeURIComponent(hex)}`;
+  const url = `https://www.google.com/search?q=${encodeURIComponent(hex)}+plane`;
   window.open(url, '_blank', 'noopener,noreferrer');
 });
 
