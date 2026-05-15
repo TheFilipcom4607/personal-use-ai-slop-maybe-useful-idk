@@ -1060,6 +1060,14 @@
   </div>
 </div>
 
+<div class="app-dialog-overlay" id="appChooseDialog" aria-hidden="true">
+  <div class="app-dialog" role="dialog" aria-modal="true" aria-labelledby="appChooseTitle" aria-describedby="appChooseMessage">
+    <h2 id="appChooseTitle"></h2>
+    <p id="appChooseMessage"></p>
+    <div class="app-dialog-actions" id="appChooseButtons"></div>
+  </div>
+</div>
+
 <div class="app-dialog-overlay" id="manualImageMenu" aria-hidden="true">
   <div class="app-dialog manual-image-dialog" role="dialog" aria-modal="true" aria-labelledby="manualImageTitle">
     <h2 id="manualImageTitle">Manual Image Links</h2>
@@ -1161,13 +1169,17 @@ const REFRESH_INTERVAL = 60000;
 const FETCH_TIMEOUT = 10000;
 const IMPORT_STORAGE_KEY = 'adsbdisplay.importedSnapshot.v1';
 const MANUAL_IMAGE_STORAGE_KEY = 'adsbdisplay.manualImages.v1';
+// Sidecar service (funplaneviewer-uploads) fronted by nginx on the same origin
+// as the GUI. See server/README.md.
+const UPLOADS_API_BASE = '/api/uploads';
 const PLANE_IMAGES_URL = 'https://raw.githubusercontent.com/sdr-enthusiasts/plane-alert-db/refs/heads/main/plane_images.csv';
 const PLANE_ALERT_DB_URL = 'https://raw.githubusercontent.com/sdr-enthusiasts/plane-alert-db/refs/heads/main/plane-alert-db.csv';
 
 let data = { mil: [], gov: [], civ: [] };
 let receiverData = { mil: [], gov: [], civ: [] };
 let importedBackups = { mil: [], gov: [], civ: [] };
-let manualImages = {};
+let manualImages = {};       // local-only, persisted in localStorage
+let serverManualImages = {}; // fetched from sidecar on startup, shared across browsers
 let activeSection = 'mil';
 let view = 'grid';
 let activeCategories = new Set();
@@ -1235,6 +1247,46 @@ function appConfirm(title, message, confirmLabel = 'Pull', cancelLabel = 'Skip')
 
 function appAlert(title, message) {
   return appDialog({ title, message, confirmLabel: 'OK' });
+}
+
+let appChooseResolve = null;
+
+function closeAppChoose(value) {
+  if (!appChooseResolve) return;
+  const overlay = document.getElementById('appChooseDialog');
+  overlay.classList.remove('open');
+  overlay.setAttribute('aria-hidden', 'true');
+  const resolve = appChooseResolve;
+  appChooseResolve = null;
+  resolve(value);
+}
+
+// choices: [{ label, value, primary?: bool, kind?: 'cancel' }]
+// Returns the chosen value, or null if dismissed via Escape / overlay click.
+function appChoose({ title, message, choices }) {
+  return new Promise(resolve => {
+    const overlay = document.getElementById('appChooseDialog');
+    document.getElementById('appChooseTitle').textContent = title;
+    document.getElementById('appChooseMessage').textContent = message;
+    const buttons = document.getElementById('appChooseButtons');
+    buttons.innerHTML = '';
+    appChooseResolve = resolve;
+
+    let primaryBtn = null;
+    choices.forEach(choice => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn' + (choice.primary ? ' btn-active' : '');
+      btn.textContent = choice.label;
+      btn.addEventListener('click', () => closeAppChoose(choice.value));
+      buttons.appendChild(btn);
+      if (choice.primary) primaryBtn = btn;
+    });
+
+    overlay.classList.add('open');
+    overlay.setAttribute('aria-hidden', 'false');
+    if (primaryBtn) primaryBtn.focus();
+  });
 }
 
 function allPlanes() {
@@ -1575,10 +1627,21 @@ function getStoredImageLinks(p) {
 }
 
 function getManualImageLinks(hex) {
-  return (manualImages[normalizeHex(hex)] || [])
+  const normalized = normalizeHex(hex);
+  // Local override always wins on this browser; server entries are the
+  // shared fallback fetched on startup.
+  const source = manualImages[normalized] || serverManualImages[normalized] || [];
+  return source
     .map(v => String(v || '').trim())
     .filter(Boolean)
     .slice(0, 4);
+}
+
+function manualImageSource(hex) {
+  const normalized = normalizeHex(hex);
+  if (manualImages[normalized]) return 'local';
+  if (serverManualImages[normalized]) return 'server';
+  return null;
 }
 
 function getImages(p) {
@@ -1624,6 +1687,104 @@ function saveManualImages() {
   }
 }
 
+// --- Sidecar (server-side persistence) integration --------------------------
+
+async function loadServerManualImages() {
+  try {
+    const res = await fetch(`${UPLOADS_API_BASE}/images.csv`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const rows = parseCSV(await res.text());
+    const next = {};
+    rows.forEach(row => {
+      const hex = normalizeHex(row.$ICAO || row.ICAO);
+      if (!hex) return;
+      const links = ['#ImageLink', '#ImageLink2', '#ImageLink3', '#ImageLink4']
+        .map(col => String(row[col] || '').trim())
+        .filter(Boolean)
+        .slice(0, 4);
+      if (links.length) next[hex] = links;
+    });
+    serverManualImages = next;
+    return true;
+  } catch (err) {
+    console.info('Server-side manual images unavailable:', err.message);
+    serverManualImages = {};
+    return false;
+  }
+}
+
+async function postServerManualImage(hex, links, registration) {
+  const res = await fetch(`${UPLOADS_API_BASE}/images`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ hex, links, registration: registration || '' })
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`HTTP ${res.status}${text ? `: ${text}` : ''}`);
+  }
+  if (links && links.length) serverManualImages[hex] = links.slice(0, 4);
+  else delete serverManualImages[hex];
+}
+
+async function deleteServerManualImage(hex) {
+  const res = await fetch(`${UPLOADS_API_BASE}/images/${encodeURIComponent(hex)}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`HTTP ${res.status}${text ? `: ${text}` : ''}`);
+  }
+  delete serverManualImages[hex];
+}
+
+async function loadServerBackup() {
+  try {
+    const res = await fetch(`${UPLOADS_API_BASE}/backup.json`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const snapshot = await res.json();
+    if (!snapshot || !snapshot.backups) return false;
+    const sections = ['mil', 'gov', 'civ'];
+    let added = 0;
+    sections.forEach(section => {
+      const list = Array.isArray(snapshot.backups[section]) ? snapshot.backups[section] : [];
+      list.forEach(plane => {
+        if (!plane || !plane.hex) return;
+        const before = importedBackups[section].length;
+        upsertBackup(section, plane);
+        if (importedBackups[section].length > before) added++;
+      });
+    });
+    if (added) {
+      refreshMergedData();
+      updateSectionCounts();
+      const pill = document.getElementById('updatedPill');
+      if (pill) pill.textContent = `Loaded ${backupCount()} backup aircraft (incl. server snapshot)`;
+    }
+    return true;
+  } catch (err) {
+    console.info('Server-side backup snapshot unavailable:', err.message);
+    return false;
+  }
+}
+
+async function postServerBackup(section, filename) {
+  const payload = {
+    version: 2,
+    section,
+    filename,
+    savedAt: new Date().toISOString(),
+    backups: importedBackups
+  };
+  const res = await fetch(`${UPLOADS_API_BASE}/backup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`HTTP ${res.status}${text ? `: ${text}` : ''}`);
+  }
+}
+
 function resetImageIndex(hex) {
   const normalizedHex = normalizeHex(hex);
   imageIndices[normalizedHex] = 0;
@@ -1656,25 +1817,37 @@ function fillManualImageFields(hex) {
   const storedLinks = p ? getStoredImageLinks(p) : [];
   const fields = manualImageInputs();
   const values = links.length ? links : storedLinks;
+  const source = manualImageSource(normalizedHex);
 
   document.getElementById('manualImageHex').value = normalizedHex;
   fields.forEach((field, i) => { field.value = values[i] || ''; });
-  document.getElementById('manualImageRemove').disabled = !links.length;
+  document.getElementById('manualImageRemove').disabled = !source;
+
+  let suffix = '';
+  if (source === 'local') suffix = ' - using local override';
+  else if (source === 'server') suffix = ' - using server entry';
+  else if (storedLinks.length) suffix = ' - database already has links';
+  else suffix = ' - no database image links';
+
   document.getElementById('manualImageStatus').textContent = p
-    ? `${describePlane(p)}${links.length ? ' - using manual links' : storedLinks.length ? ' - database already has links' : ' - no database image links'}`
-    : normalizedHex ? 'Aircraft not currently loaded; links will still be saved locally.' : '';
+    ? `${describePlane(p)}${suffix}`
+    : normalizedHex ? 'Aircraft not currently loaded; links will still be saved.' : '';
 }
 
 function populateManualImageSelect(selectedHex) {
   const select = document.getElementById('manualImagePlaneSelect');
   const selected = normalizeHex(selectedHex);
   const planes = allKnownPlanes()
-    .filter(p => !getStoredImageLinks(p).length || manualImages[normalizeHex(p.hex || p.icao)])
+    .filter(p => {
+      const hex = normalizeHex(p.hex || p.icao);
+      return !getStoredImageLinks(p).length || manualImages[hex] || serverManualImages[hex];
+    })
     .sort((a, b) => describePlane(a).localeCompare(describePlane(b)));
 
   select.innerHTML = '<option value="">Select a loaded aircraft...</option>' + planes.map(p => {
     const hex = normalizeHex(p.hex || p.icao);
-    const suffix = manualImages[hex] ? ' (manual)' : '';
+    const src = manualImageSource(hex);
+    const suffix = src === 'local' ? ' (local)' : src === 'server' ? ' (server)' : '';
     return `<option value="${esc(hex)}"${hex === selected ? ' selected' : ''}>${esc(describePlane(p) + suffix)}</option>`;
   }).join('');
 }
@@ -1705,7 +1878,7 @@ function isValidImageUrl(url) {
   }
 }
 
-function saveManualImageEntry() {
+async function saveManualImageEntry() {
   const hex = normalizeHex(document.getElementById('manualImageHex').value);
   const links = manualImageInputs().map(input => input.value.trim()).filter(Boolean);
   const invalid = links.find(link => !isValidImageUrl(link));
@@ -1718,29 +1891,105 @@ function saveManualImageEntry() {
     document.getElementById('manualImageStatus').textContent = 'Image links must be full http:// or https:// URLs.';
     return;
   }
+  if (!links.length) {
+    document.getElementById('manualImageStatus').textContent = 'Add at least one image link, or use Remove.';
+    return;
+  }
 
-  if (links.length) manualImages[hex] = links.slice(0, 4);
-  else delete manualImages[hex];
+  const where = await appChoose({
+    title: `Save image links for ${hex}`,
+    message: 'Save where? Local stays in this browser only. Server is shared with everyone hitting this Pi.',
+    choices: [
+      { label: 'Cancel', value: null, kind: 'cancel' },
+      { label: 'Local only', value: 'local' },
+      { label: 'Save on server', value: 'server', primary: true }
+    ]
+  });
+  if (!where) return;
 
-  const persisted = saveManualImages();
+  const plane = findPlane(hex);
+  const registration = plane && plane.registration ? plane.registration : '';
+  const updatedPill = document.getElementById('updatedPill');
+
+  if (where === 'server') {
+    try {
+      updatedPill.textContent = 'Saving to server...';
+      await postServerManualImage(hex, links.slice(0, 4), registration);
+      // Clear any local override so the server entry takes effect.
+      if (manualImages[hex]) {
+        delete manualImages[hex];
+        saveManualImages();
+      }
+      updatedPill.textContent = `Saved ${links.length} image link${links.length === 1 ? '' : 's'} on server for ${hex}`;
+    } catch (err) {
+      updatedPill.textContent = `Server save failed for ${hex}`;
+      await appAlert('Server Save Failed', `Could not save on the Pi: ${err.message}\n\nNothing was changed.`);
+      return;
+    }
+  } else {
+    manualImages[hex] = links.slice(0, 4);
+    const persisted = saveManualImages();
+    updatedPill.textContent = `Saved ${links.length} local image link${links.length === 1 ? '' : 's'} for ${hex}${persisted ? '' : ' (not saved)'}`;
+  }
+
   resetImageIndex(hex);
-  document.getElementById('updatedPill').textContent = links.length
-    ? `Saved ${links.length} manual image link${links.length === 1 ? '' : 's'} for ${hex}${persisted ? '' : ' (not saved)'}`
-    : `Removed manual image links for ${hex}${persisted ? '' : ' (not saved)'}`;
-
   populateManualImageSelect(hex);
   fillManualImageFields(hex);
   if (modalHex === hex) openModal(hex);
   preservingScroll(render);
 }
 
-function removeManualImageEntry() {
+async function removeManualImageEntry() {
   const hex = normalizeHex(document.getElementById('manualImageHex').value);
   if (!hex) return;
-  delete manualImages[hex];
-  saveManualImages();
+  const hasLocal = !!manualImages[hex];
+  const hasServer = !!serverManualImages[hex];
+  if (!hasLocal && !hasServer) return;
+
+  let where;
+  if (hasLocal && hasServer) {
+    where = await appChoose({
+      title: `Remove image links for ${hex}`,
+      message: 'Both a local override and a server entry exist. Which to remove?',
+      choices: [
+        { label: 'Cancel', value: null, kind: 'cancel' },
+        { label: 'Local only', value: 'local' },
+        { label: 'Server (everyone)', value: 'server' },
+        { label: 'Both', value: 'both', primary: true }
+      ]
+    });
+  } else if (hasLocal) {
+    where = 'local';
+  } else {
+    const ok = await appConfirm(
+      `Remove server entry for ${hex}?`,
+      'This removes the image links for everyone on this Pi. Continue?',
+      'Remove from server',
+      'Cancel'
+    );
+    where = ok ? 'server' : null;
+  }
+  if (!where) return;
+
+  const updatedPill = document.getElementById('updatedPill');
+
+  try {
+    if (where === 'local' || where === 'both') {
+      delete manualImages[hex];
+      saveManualImages();
+    }
+    if (where === 'server' || where === 'both') {
+      updatedPill.textContent = 'Removing from server...';
+      await deleteServerManualImage(hex);
+    }
+  } catch (err) {
+    updatedPill.textContent = `Server remove failed for ${hex}`;
+    await appAlert('Server Remove Failed', `Could not remove on the Pi: ${err.message}`);
+    // Continue to refresh UI so any local change still shows.
+  }
+
   resetImageIndex(hex);
-  document.getElementById('updatedPill').textContent = `Removed manual image links for ${hex}`;
+  updatedPill.textContent = `Removed manual image links for ${hex}`;
   populateManualImageSelect(hex);
   fillManualImageFields(hex);
   if (modalHex === hex) openModal(hex);
@@ -2111,13 +2360,43 @@ async function importAircraft(items, filename) {
     buildCategoryChips();
     preservingScroll(render);
   }
-  const persisted = saveImportedSnapshot(targetSection, filename);
+  const where = await appChoose({
+    title: 'Where to save this backup?',
+    message: 'Local stays in this browser only. Server is shared with everyone hitting this Pi.',
+    choices: [
+      { label: 'Don\'t save', value: 'none' },
+      { label: 'Local only', value: 'local' },
+      { label: 'Save on server', value: 'server', primary: true }
+    ]
+  }) || 'none';
+
+  let persistNote = '';
+  if (where === 'local') {
+    const persisted = saveImportedSnapshot(targetSection, filename);
+    persistNote = persisted ? '' : ' (not saved)';
+  } else if (where === 'server') {
+    try {
+      document.getElementById('updatedPill').textContent = 'Saving backup to server...';
+      await postServerBackup(targetSection, filename);
+      // Also keep a local copy so this browser doesn't refetch from server on
+      // every reload — server is just the shared canonical source.
+      saveImportedSnapshot(targetSection, filename);
+      persistNote = ' (saved on server)';
+    } catch (err) {
+      persistNote = ' (server save failed)';
+      await appAlert('Server Save Failed', `Could not save backup on the Pi: ${err.message}\n\nKept locally on this browser only.`);
+      saveImportedSnapshot(targetSection, filename);
+    }
+  } else {
+    persistNote = ' (not saved)';
+  }
+
   const enrichSummary = [
     filledImages ? `pulled ${filledImages} image sets` : '',
     filledTags ? `pulled ${filledTags} tag sets` : ''
   ].filter(Boolean).join(', ');
   document.getElementById('updatedPill').textContent =
-    `Added ${imported.length} backup aircraft${enrichSummary ? `, ${enrichSummary}` : ''} from ${filename}${persisted ? '' : ' (not saved)'}`;
+    `Added ${imported.length} backup aircraft${enrichSummary ? `, ${enrichSummary}` : ''} from ${filename}${persistNote}`;
 }
 
 async function importFile(file) {
@@ -2337,6 +2616,10 @@ document.addEventListener('keydown', e => {
     closeManualImageMenu();
     return;
   }
+  if (e.key === 'Escape' && document.getElementById('appChooseDialog').classList.contains('open')) {
+    closeAppChoose(null);
+    return;
+  }
   if (e.key === 'Escape' && document.getElementById('backendDialog').classList.contains('open')) {
     closeBackendDialog();
     return;
@@ -2417,6 +2700,9 @@ document.getElementById('importFile').addEventListener('change', async (e) => {
 
 document.getElementById('appDialogCancel').addEventListener('click', () => closeAppDialog(false));
 document.getElementById('appDialogConfirm').addEventListener('click', () => closeAppDialog(true));
+document.getElementById('appChooseDialog').addEventListener('click', (e) => {
+  if (e.target.id === 'appChooseDialog') closeAppChoose(null);
+});
 
 // Backend URL dialog
 function openBackendDialog() {
@@ -2616,6 +2902,17 @@ loadManualImages();
 loadImportedSnapshot();
 fetchAll(false);
 startPolling();
+
+// Pull shared server-side data in parallel; failures are non-fatal (the GUI
+// works fine without the sidecar). If anything came back, refresh the UI so
+// the new entries show up.
+Promise.allSettled([
+  loadServerManualImages().then(ok => ok && Object.keys(serverManualImages).length),
+  loadServerBackup()
+]).then(results => {
+  const gotImages = results[0].status === 'fulfilled' && results[0].value;
+  if (gotImages) preservingScroll(render);
+});
 </script>
 </body>
 </html>
