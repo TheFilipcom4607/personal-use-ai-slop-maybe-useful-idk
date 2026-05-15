@@ -3,10 +3,10 @@
 Tiny Flask service that gives the static GUI a place to write
 shared, server-side data:
 
-- `images.csv` — manual image links, in the same `plane-alert-db` schema
+- `images.csv`: manual image links, in the same `plane-alert-db` schema
   as the upstream `plane_images.csv` (so the existing image-pull merge
   logic still applies).
-- `backup.json` — the same shape the GUI's `Import` button produces.
+- `backup.json`: the same shape the GUI's `Import` button produces.
 
 It's a sidecar because the existing nginx-served static site can't
 accept POSTs. nginx fronts the sidecar at `/api/uploads/` so the GUI
@@ -18,13 +18,13 @@ just talks to the page's own origin.
 |--------|-----------------------------------|------------------------------------------------|
 | GET    | `/api/uploads/health`             | `{ "ok": true }`                               |
 | GET    | `/api/uploads/images.csv`         | CSV in plane-alert-db schema (empty header if no rows yet) |
-| POST   | `/api/uploads/images`             | `{ "hex": "A1B2C3", "registration": "...", "links": ["https://...", ...] }` — empty `links` deletes the row |
+| POST   | `/api/uploads/images`             | `{ "hex": "A1B2C3", "registration": "...", "links": ["https://...", ...] }`, empty `links` deletes the row |
 | DELETE | `/api/uploads/images/<hex>`       | Removes a single hex                           |
 | GET    | `/api/uploads/backup.json`        | Stored snapshot, or empty `{ mil:[], gov:[], civ:[] }` |
 | POST   | `/api/uploads/backup`             | Whole-snapshot replace, body matches client export shape |
 | DELETE | `/api/uploads/backup`             | Wipes the stored snapshot                      |
 
-No auth — assumes LAN/Tailscale-only access (matches the existing
+No auth, assumes LAN/Tailscale-only access (matches the existing
 SkyStats backend on `:5173`).
 
 ## Install on the Pi
@@ -65,7 +65,7 @@ curl -fsS http://thef-pi4/api/uploads/health
 ```
 
 Both files are written atomically (write to `*.tmp`, then `rename`).
-A single global lock serializes writes — fine at this traffic level.
+A single global lock serializes writes, which is fine at this traffic level.
 
 ## Tweaks
 

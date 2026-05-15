@@ -20,11 +20,13 @@ It's also optimised for mobile since that was my main priority.
 - Aircraft detail modal with image gallery, tags, metadata, and last-seen time.
 - Image fallback cards for aircraft without photos.
 - 24-hour time formatting.
-- CSV and JSON export for the current filtered list.
+- CSV export for the current filtered list, with an "include tags" toggle.
 - CSV and JSON import for restoring backups.
 - Imported backups are merged into the live receiver feed instead of replacing it.
 - Imported backup data persists locally in the browser, with optional shared persistence on the Pi (see [server/README.md](server/README.md)).
 - Manual per-aircraft image links via a hidden menu (Ctrl+Shift+M, or triple-click the title), saved either locally or on the Pi for everyone.
+- One-click JetPhotos lookup by registration and Google search by ICAO hex from inside the manual-image menu.
+- Optional Tailscale-friendly backend URL override for accessing the GUI from outside the local network.
 - Optional import enrichment from [plane-alert-db](https://github.com/sdr-enthusiasts/plane-alert-db):
   - pull missing image links from `plane_images.csv`
   - pull missing tags and metadata from `plane-alert-db.csv`
@@ -58,16 +60,16 @@ The backend defaults to returning only 5 planes, so you need to change that befo
 
 ## Accessing over Tailscale (or remote networks)
 
-By default, the GUI talks to the SkyStats backend at the same hostname the page was loaded from, on port `5173`. So if you open the GUI via your feeder's Tailscale hostname (or its tailnet IP), the API calls automatically go over Tailscale too — no extra configuration needed, as long as port `5173` is reachable on that host over the tailnet.
+By default, the GUI talks to the SkyStats backend at the same hostname the page was loaded from, on port `5173`. So if you open the GUI via your feeder's Tailscale hostname (or its tailnet IP), the API calls automatically go over Tailscale too, no extra configuration needed, as long as port `5173` is reachable on that host over the tailnet.
 
-If your setup needs a different backend address (for example, the GUI is hosted on a different machine than the feeder, or you're proxying SkyStats through Tailscale Serve), click the **Backend** button in the toolbar and enter the full URL (e.g. `http://my-feeder.tailnet-name.ts.net:5173` or `https://feeder.tailnet-name.ts.net`). The value is stored in your browser's local storage and used for all subsequent requests. Click *Reset to default* to go back to the automatic behavior.
+If your setup needs a different backend address (for example, the GUI is hosted on a different machine than the feeder, or you're proxying SkyStats through Tailscale Serve), open the hidden manual-image menu (Ctrl+Shift+M, or triple-click the title) and click *Change backend URL…* at the bottom, then enter the full URL (e.g. `http://my-feeder.tailnet-name.ts.net:5173` or `https://feeder.tailnet-name.ts.net`). The value is stored in your browser's local storage and used for all subsequent requests. Click *Reset to default* to go back to the automatic behavior.
 
 If the GUI loads but the aircraft list doesn't, the error message will include a *Change backend URL* button that opens the same dialog.
 
-Note: if you access the GUI over HTTPS (e.g. via Tailscale Serve with TLS), the backend URL also needs to be HTTPS — browsers block mixed HTTP/HTTPS requests.
+Note: if you access the GUI over HTTPS (e.g. via Tailscale Serve with TLS), the backend URL also needs to be HTTPS, browsers block mixed HTTP/HTTPS requests.
 
 ## Server-side persistence (optional)
 
-By default, manual image links and imported backups live in the browser's local storage — they don't follow you to other devices. If you want them shared across every browser hitting the Pi, install the small Flask sidecar and add a one-line nginx proxy. The GUI then prompts *Local only* / *Save on server* whenever you save a manual image or import a backup.
+By default, manual image links and imported backups live in the browser's local storage and don't follow you to other devices. If you want them shared across every browser hitting the Pi, install the small Flask sidecar and add a one-line nginx proxy. The GUI then prompts *Local only* / *Save on server* whenever you save a manual image or import a backup.
 
 Setup is documented in [server/README.md](server/README.md). It's strictly optional: without it the GUI works exactly as before and silently skips the server fetch.

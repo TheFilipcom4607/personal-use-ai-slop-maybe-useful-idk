@@ -592,7 +592,7 @@
     select { flex: 1; min-width: 0; padding: 7px 8px; font-size: 0.78rem; }
     .btn { padding: 7px 10px; font-size: 0.78rem; }
 
-    /* Collapsible wrapper — animate the whole bottom block as one unit.
+    /* Collapsible wrapper, animate the whole bottom block as one unit.
        Uses a CSS variable for measured height so the transition is smooth
        and predictable instead of fighting with max-height: 0. */
     .header-collapsible {
@@ -632,7 +632,7 @@
     .grid { padding: 10px; gap: 10px; grid-template-columns: 1fr; }
     .card-img-wrap { height: 200px; }
 
-    /* Kill hover effects on touch — no ghost taps */
+    /* Kill hover effects on touch, no ghost taps */
     .card { transition: none; }
     .card:hover { transform: none; border-color: var(--border); }
     .card.card-gov:hover { border-color: var(--border); }
@@ -752,7 +752,7 @@
     vertical-align: middle;
   }
 
-  /* Mobile modal overrides — must come AFTER default modal styles
+  /* Mobile modal overrides, must come AFTER default modal styles
      so the cascade applies them. */
   @media (max-width: 640px) {
     .modal-overlay {
@@ -948,6 +948,9 @@
 
   .manual-image-jetphotos-row {
     margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
   }
   .manual-image-jetphotos-row .btn[disabled] {
     opacity: 0.5;
@@ -1038,7 +1041,6 @@
   <div class="export-divider"></div>
   <div class="export-section">Download as</div>
   <button id="exportCsv"><span class="check"></span>CSV</button>
-  <button id="exportJson"><span class="check"></span>JSON</button>
 </div>
 
 <div id="content">
@@ -1093,6 +1095,7 @@
     <input type="text" id="manualImageHex" maxlength="8" autocomplete="off" placeholder="A1B2C3">
     <div class="manual-image-jetphotos-row">
       <button class="btn" type="button" id="manualImageJetphotos" disabled title="Open JetPhotos search for this aircraft's registration">Search JetPhotos for <span id="manualImageJetphotosReg">registration</span></button>
+      <button class="btn" type="button" id="manualImageGoogle" disabled title="Google the ICAO hex">Google hex <span id="manualImageGoogleHex"></span></button>
     </div>
 
     <label>Image links</label>
@@ -1376,7 +1379,7 @@ function diffHexes(section, arr) {
   const currentSet = new Set(arr.map(p => p.hex));
   const prev = prevHexes[section];
   if (prev === null) {
-    // First fetch — don't flag everything as new.
+    // First fetch, don't flag everything as new.
     newHexes[section] = new Set();
   } else {
     const added = new Set();
@@ -1482,7 +1485,7 @@ function switchSection(section) {
   document.getElementById('tabGov').className = 'section-tab' + (section === 'gov' ? ' active-gov' : '');
   document.getElementById('tabCiv').className = 'section-tab' + (section === 'civ' ? ' active-civ' : '');
 
-  // Changing section shows the list from scratch — don't flash every card as "new".
+  // Changing section shows the list from scratch, don't flash every card as "new".
   newHexes[section] = new Set();
 
   updateStats();
@@ -1563,7 +1566,7 @@ function setSort(key) {
   render();
 }
 
-// Image helpers — build an <img> or a text placeholder.
+// Image helpers: build an <img> or a text placeholder.
 function imgTag(url, p, extraClass) {
   const cls = extraClass ? ` ${extraClass}` : '';
   if (!url) return placeholderTag(p, extraClass);
@@ -1852,6 +1855,18 @@ function fillManualImageFields(hex) {
     delete jpBtn.dataset.reg;
   }
 
+  const ggBtn = document.getElementById('manualImageGoogle');
+  const ggHex = document.getElementById('manualImageGoogleHex');
+  if (normalizedHex) {
+    ggBtn.disabled = false;
+    ggHex.textContent = normalizedHex;
+    ggBtn.dataset.hex = normalizedHex;
+  } else {
+    ggBtn.disabled = true;
+    ggHex.textContent = '';
+    delete ggBtn.dataset.hex;
+  }
+
   let suffix = '';
   if (source === 'local') suffix = ' - using local override';
   else if (source === 'server') suffix = ' - using server entry';
@@ -2061,17 +2076,6 @@ function exportCSV() {
     }).join(',')
   );
   triggerDownload([header, ...rows].join('\n'), exportFilename('csv'), 'text/csv');
-}
-
-function exportJSON() {
-  const items = exportIncludesTags()
-    ? getFiltered().map(withEffectiveImages)
-    : getFiltered().map(withEffectiveImages).map(({ tag1, tag2, tag3, ...rest }) => rest);
-  triggerDownload(
-    JSON.stringify(items, null, 2),
-    exportFilename('json'),
-    'application/json'
-  );
 }
 
 function parseCSV(text) {
@@ -2321,7 +2325,8 @@ function loadImportedSnapshot() {
     gov: Array.isArray(source.gov) ? source.gov : [],
     civ: Array.isArray(source.civ) ? source.civ : []
   };
-  activeSection = ['mil','gov','civ'].includes(snapshot.section) ? snapshot.section : activeSection;
+  // Always start on Military regardless of which section the snapshot was
+  // last imported into; that's the section the user cares about most.
   refreshMergedData();
   newHexes = { mil: new Set(), gov: new Set(), civ: new Set() };
   updateSectionCounts();
@@ -2408,7 +2413,7 @@ async function importAircraft(items, filename) {
       document.getElementById('updatedPill').textContent = 'Saving backup to server...';
       await postServerBackup(targetSection, filename);
       // Also keep a local copy so this browser doesn't refetch from server on
-      // every reload — server is just the shared canonical source.
+      // every reload; server is just the shared canonical source.
       saveImportedSnapshot(targetSection, filename);
       persistNote = ' (saved on server)';
     } catch (err) {
@@ -2582,7 +2587,7 @@ function openModal(hex) {
   const badgeLabel = grp === 'gov' ? 'GOV' : grp === 'civ' ? 'CIV' : 'MIL';
   document.getElementById('modalType').innerHTML =
     `${esc(p.type || p.icao_type)} <span class="modal-group-badge ${badgeClass}">${badgeLabel}</span>`;
-  document.getElementById('modalOperator').textContent = `${p.operator}${p.flight ? ' — ' + p.flight : ''}`;
+  document.getElementById('modalOperator').textContent = `${p.operator}${p.flight ? ' · ' + p.flight : ''}`;
 
   const thumbs = document.getElementById('modalThumbs');
   thumbs.hidden = imgs.length <= 1;
@@ -2777,7 +2782,7 @@ document.getElementById('backendDialogInput').addEventListener('keydown', (e) =>
   if (e.key === 'Enter') { e.preventDefault(); document.getElementById('backendDialogSave').click(); }
 });
 
-// Manual image links menu (hidden — open via Ctrl+Shift+M or triple-click on title)
+// Manual image links menu (hidden, open via Ctrl+Shift+M or triple-click on title)
 document.getElementById('appTitle').addEventListener('click', (e) => {
   if (e.detail >= 3) openManualImageMenu();
 });
@@ -2806,6 +2811,12 @@ document.getElementById('manualImageJetphotos').addEventListener('click', (e) =>
   const url = `https://www.jetphotos.com/showphotos.php?keywords-type=reg&keywords=${encodeURIComponent(reg)}&search-type=Advanced&keywords-contain=0&sort-order=4`;
   window.open(url, '_blank', 'noopener,noreferrer');
 });
+document.getElementById('manualImageGoogle').addEventListener('click', (e) => {
+  const hex = e.currentTarget.dataset.hex;
+  if (!hex) return;
+  const url = `https://www.google.com/search?q=${encodeURIComponent(hex)}`;
+  window.open(url, '_blank', 'noopener,noreferrer');
+});
 
 // Export dropdown
 const exportDrop = document.getElementById('exportDrop');
@@ -2826,10 +2837,6 @@ document.getElementById('btnExportTags').addEventListener('click', (e) => {
 });
 document.getElementById('exportCsv').addEventListener('click', () => {
   exportCSV();
-  exportDrop.classList.remove('open');
-});
-document.getElementById('exportJson').addEventListener('click', () => {
-  exportJSON();
   exportDrop.classList.remove('open');
 });
 document.addEventListener('click', () => exportDrop.classList.remove('open'));

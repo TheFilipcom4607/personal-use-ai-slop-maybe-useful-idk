@@ -32,7 +32,7 @@ HOST = os.environ.get("HOST", "127.0.0.1")
 
 CSV_HEADER = ["$ICAO", "$Registration", "#ImageLink", "#ImageLink2", "#ImageLink3", "#ImageLink4"]
 
-# Global lock — single-process, low traffic; cheap correctness over throughput.
+# Global lock: single-process, low traffic; cheap correctness over throughput.
 _lock = threading.Lock()
 
 app = Flask(__name__)
@@ -40,7 +40,7 @@ app = Flask(__name__)
 
 @app.after_request
 def _allow_cors(response):
-    """Permissive CORS — service is LAN/Tailscale-only behind nginx, and
+    """Permissive CORS: service is LAN/Tailscale-only behind nginx, and
     the GUI may be served from a different origin during development."""
     response.headers.setdefault("Access-Control-Allow-Origin", "*")
     response.headers.setdefault("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
