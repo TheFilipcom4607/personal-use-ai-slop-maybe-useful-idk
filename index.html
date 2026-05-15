@@ -202,9 +202,6 @@
     border-color: var(--accent);
   }
 
-  /* Backend button: text on desktop, icon-only on mobile. */
-  #btnBackend .btn-icon-only-mobile { display: none; vertical-align: middle; }
-
   /* Filter chips */
   .chip-row {
     display: flex;
@@ -595,11 +592,6 @@
     select { flex: 1; min-width: 0; padding: 7px 8px; font-size: 0.78rem; }
     .btn { padding: 7px 10px; font-size: 0.78rem; }
 
-    /* Stopgap: shrink Backend to icon-only on mobile so the toolbar fits. */
-    #btnBackend { padding: 7px 8px; }
-    #btnBackend .btn-label-desktop { display: none; }
-    #btnBackend .btn-icon-only-mobile { display: inline-block; }
-
     /* Collapsible wrapper — animate the whole bottom block as one unit.
        Uses a CSS variable for measured height so the transition is smooth
        and predictable instead of fighting with max-height: 0. */
@@ -890,6 +882,65 @@
     flex-wrap: wrap;
   }
 
+  .manual-image-dialog {
+    width: min(520px, 100%);
+  }
+
+  .manual-image-dialog label {
+    display: block;
+    margin-top: 12px;
+    color: var(--text-dim);
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+
+  .manual-image-dialog input,
+  .manual-image-dialog select {
+    width: 100%;
+    margin-top: 6px;
+    padding: 9px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 0.86rem;
+    outline: none;
+  }
+
+  .manual-image-dialog input:focus,
+  .manual-image-dialog select:focus {
+    border-color: var(--accent);
+  }
+
+  .manual-image-links {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  .manual-image-status {
+    min-height: 1.2em;
+    margin-top: 10px;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+  }
+
+  .manual-image-actions {
+    justify-content: space-between;
+  }
+
+  .manual-image-actions .right-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .manual-image-divider {
+    margin: 18px 0 0;
+    border: none;
+    border-top: 1px solid var(--border);
+  }
+
   .backend-input {
     width: 100%;
     margin-top: 10px;
@@ -916,7 +967,7 @@
 
 <div class="header">
   <div class="header-top">
-    <h1><span class="mil-color">Fun</span> <span class="gov-color">Plane</span> <span style="color:var(--civ)">Viewer</span></h1>
+    <h1 id="appTitle"><span class="mil-color">Fun</span> <span class="gov-color">Plane</span> <span style="color:var(--civ)">Viewer</span></h1>
     <div class="header-stats">
       <span class="stat-pill" id="sourcePill"><span class="live-dot"></span> Live</span>
       <span class="stat-pill" id="countPill">0 aircraft</span>
@@ -956,10 +1007,6 @@
         </button>
       </div>
       <button class="btn" id="btnRefresh">Refresh</button>
-      <button class="btn" id="btnBackend" title="Change SkyStats backend URL (for Tailscale or remote access)" aria-label="Change backend URL">
-        <svg class="btn-icon-only-mobile" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 1.5a1.2 1.2 0 0 0-1.18.99l-.18 1.06a5.5 5.5 0 0 0-1.1.64l-1-.4a1.2 1.2 0 0 0-1.42.52l-.78 1.34a1.2 1.2 0 0 0 .25 1.49l.82.7a5.5 5.5 0 0 0 0 1.32l-.82.7a1.2 1.2 0 0 0-.25 1.49l.78 1.34a1.2 1.2 0 0 0 1.42.52l1-.4c.34.25.7.46 1.1.64l.18 1.06A1.2 1.2 0 0 0 8 14.5a1.2 1.2 0 0 0 1.18-.99l.18-1.06c.4-.18.76-.39 1.1-.64l1 .4a1.2 1.2 0 0 0 1.42-.52l.78-1.34a1.2 1.2 0 0 0-.25-1.49l-.82-.7a5.5 5.5 0 0 0 0-1.32l.82-.7a1.2 1.2 0 0 0 .25-1.49l-.78-1.34a1.2 1.2 0 0 0-1.42-.52l-1 .4a5.5 5.5 0 0 0-1.1-.64l-.18-1.06A1.2 1.2 0 0 0 8 1.5Zm0 4.25a2.25 2.25 0 1 1 0 4.5 2.25 2.25 0 0 1 0-4.5Z"/></svg>
-        <span class="btn-label-desktop">Backend</span>
-      </button>
       <button class="btn" id="btnImport" title="Import CSV or JSON export">Import</button>
       <input class="file-input" type="file" id="importFile" accept=".csv,.json,text/csv,application/json">
       <div class="export-wrap" id="exportWrap">
@@ -1009,6 +1056,41 @@
     <div class="app-dialog-actions">
       <button class="btn" type="button" id="appDialogCancel">Cancel</button>
       <button class="btn btn-active" type="button" id="appDialogConfirm">OK</button>
+    </div>
+  </div>
+</div>
+
+<div class="app-dialog-overlay" id="manualImageMenu" aria-hidden="true">
+  <div class="app-dialog manual-image-dialog" role="dialog" aria-modal="true" aria-labelledby="manualImageTitle">
+    <h2 id="manualImageTitle">Manual Image Links</h2>
+    <p>Add local image links for aircraft that are missing photos in the image database.</p>
+
+    <label for="manualImagePlaneSelect">Aircraft without database images</label>
+    <select id="manualImagePlaneSelect"></select>
+
+    <label for="manualImageHex">ICAO hex</label>
+    <input type="text" id="manualImageHex" maxlength="8" autocomplete="off" placeholder="A1B2C3">
+
+    <label>Image links</label>
+    <div class="manual-image-links">
+      <input type="url" id="manualImageUrl1" placeholder="https://...">
+      <input type="url" id="manualImageUrl2" placeholder="https://...">
+      <input type="url" id="manualImageUrl3" placeholder="https://...">
+      <input type="url" id="manualImageUrl4" placeholder="https://...">
+    </div>
+
+    <div class="manual-image-status" id="manualImageStatus"></div>
+    <div class="app-dialog-actions manual-image-actions">
+      <button class="btn" type="button" id="manualImageRemove">Remove</button>
+      <div class="right-actions">
+        <button class="btn" type="button" id="manualImageClose">Close</button>
+        <button class="btn btn-active" type="button" id="manualImageSave">Save</button>
+      </div>
+    </div>
+
+    <hr class="manual-image-divider">
+    <div class="app-dialog-actions" style="justify-content: flex-start;">
+      <button class="btn" type="button" id="manualImageBackend" title="Change SkyStats backend URL (for Tailscale or remote access)">Change backend URL…</button>
     </div>
   </div>
 </div>
@@ -1078,12 +1160,14 @@ rebuildApi();
 const REFRESH_INTERVAL = 60000;
 const FETCH_TIMEOUT = 10000;
 const IMPORT_STORAGE_KEY = 'adsbdisplay.importedSnapshot.v1';
+const MANUAL_IMAGE_STORAGE_KEY = 'adsbdisplay.manualImages.v1';
 const PLANE_IMAGES_URL = 'https://raw.githubusercontent.com/sdr-enthusiasts/plane-alert-db/refs/heads/main/plane_images.csv';
 const PLANE_ALERT_DB_URL = 'https://raw.githubusercontent.com/sdr-enthusiasts/plane-alert-db/refs/heads/main/plane-alert-db.csv';
 
 let data = { mil: [], gov: [], civ: [] };
 let receiverData = { mil: [], gov: [], civ: [] };
 let importedBackups = { mil: [], gov: [], civ: [] };
+let manualImages = {};
 let activeSection = 'mil';
 let view = 'grid';
 let activeCategories = new Set();
@@ -1435,9 +1519,14 @@ document.addEventListener('error', (e) => {
   t.outerHTML = placeholderTag(p, extras);
 }, true);
 
+function normalizeHex(hex) {
+  return String(hex || '').trim().toUpperCase();
+}
+
 function findPlane(hex) {
+  const normalizedHex = normalizeHex(hex);
   for (const s of ['mil','gov','civ']) {
-    const hit = data[s].find(p => p.hex === hex);
+    const hit = data[s].find(p => normalizeHex(p.hex) === normalizedHex);
     if (hit) return hit;
   }
   return null;
@@ -1479,8 +1568,183 @@ function formatDateTime(date) {
   });
 }
 
+function getStoredImageLinks(p) {
+  return [p.image_link_1, p.image_link_2, p.image_link_3, p.image_link_4]
+    .map(v => String(v || '').trim())
+    .filter(Boolean);
+}
+
+function getManualImageLinks(hex) {
+  return (manualImages[normalizeHex(hex)] || [])
+    .map(v => String(v || '').trim())
+    .filter(Boolean)
+    .slice(0, 4);
+}
+
 function getImages(p) {
-  return [p.image_link_1, p.image_link_2, p.image_link_3, p.image_link_4].filter(Boolean);
+  const manual = getManualImageLinks(p && (p.hex || p.icao));
+  return manual.length ? manual : getStoredImageLinks(p || {});
+}
+
+function withEffectiveImages(p) {
+  const copy = { ...p };
+  const links = getImages(p);
+  for (let i = 0; i < 4; i++) {
+    copy[`image_link_${i + 1}`] = links[i] || '';
+  }
+  return copy;
+}
+
+function loadManualImages() {
+  let stored;
+  try {
+    stored = JSON.parse(localStorage.getItem(MANUAL_IMAGE_STORAGE_KEY) || '{}');
+  } catch (err) {
+    localStorage.removeItem(MANUAL_IMAGE_STORAGE_KEY);
+    return;
+  }
+
+  manualImages = {};
+  Object.entries(stored || {}).forEach(([hex, links]) => {
+    const normalizedHex = normalizeHex(hex);
+    const cleaned = Array.isArray(links)
+      ? links.map(v => String(v || '').trim()).filter(Boolean).slice(0, 4)
+      : [];
+    if (normalizedHex && cleaned.length) manualImages[normalizedHex] = cleaned;
+  });
+}
+
+function saveManualImages() {
+  try {
+    localStorage.setItem(MANUAL_IMAGE_STORAGE_KEY, JSON.stringify(manualImages));
+    return true;
+  } catch (err) {
+    console.warn('Could not persist manual image links', err);
+    return false;
+  }
+}
+
+function resetImageIndex(hex) {
+  const normalizedHex = normalizeHex(hex);
+  imageIndices[normalizedHex] = 0;
+  const p = findPlane(normalizedHex);
+  if (p && p.hex) imageIndices[p.hex] = 0;
+}
+
+function allKnownPlanes() {
+  return ['mil','gov','civ'].flatMap(section => data[section].map(p => ({ ...p, _section: section })));
+}
+
+function describePlane(p) {
+  const parts = [
+    p.hex || p.icao,
+    p.type || p.icao_type || 'Unknown type',
+    p.registration,
+    p.operator
+  ].filter(Boolean);
+  return parts.join(' - ');
+}
+
+function manualImageInputs() {
+  return [1, 2, 3, 4].map(i => document.getElementById(`manualImageUrl${i}`));
+}
+
+function fillManualImageFields(hex) {
+  const normalizedHex = normalizeHex(hex);
+  const p = findPlane(normalizedHex);
+  const links = getManualImageLinks(normalizedHex);
+  const storedLinks = p ? getStoredImageLinks(p) : [];
+  const fields = manualImageInputs();
+  const values = links.length ? links : storedLinks;
+
+  document.getElementById('manualImageHex').value = normalizedHex;
+  fields.forEach((field, i) => { field.value = values[i] || ''; });
+  document.getElementById('manualImageRemove').disabled = !links.length;
+  document.getElementById('manualImageStatus').textContent = p
+    ? `${describePlane(p)}${links.length ? ' - using manual links' : storedLinks.length ? ' - database already has links' : ' - no database image links'}`
+    : normalizedHex ? 'Aircraft not currently loaded; links will still be saved locally.' : '';
+}
+
+function populateManualImageSelect(selectedHex) {
+  const select = document.getElementById('manualImagePlaneSelect');
+  const selected = normalizeHex(selectedHex);
+  const planes = allKnownPlanes()
+    .filter(p => !getStoredImageLinks(p).length || manualImages[normalizeHex(p.hex || p.icao)])
+    .sort((a, b) => describePlane(a).localeCompare(describePlane(b)));
+
+  select.innerHTML = '<option value="">Select a loaded aircraft...</option>' + planes.map(p => {
+    const hex = normalizeHex(p.hex || p.icao);
+    const suffix = manualImages[hex] ? ' (manual)' : '';
+    return `<option value="${esc(hex)}"${hex === selected ? ' selected' : ''}>${esc(describePlane(p) + suffix)}</option>`;
+  }).join('');
+}
+
+function openManualImageMenu(hex) {
+  const initialHex = normalizeHex(hex || modalHex || '');
+  populateManualImageSelect(initialHex);
+  fillManualImageFields(initialHex);
+
+  const overlay = document.getElementById('manualImageMenu');
+  overlay.classList.add('open');
+  overlay.setAttribute('aria-hidden', 'false');
+  document.getElementById('manualImageHex').focus();
+}
+
+function closeManualImageMenu() {
+  const overlay = document.getElementById('manualImageMenu');
+  overlay.classList.remove('open');
+  overlay.setAttribute('aria-hidden', 'true');
+}
+
+function isValidImageUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch (err) {
+    return false;
+  }
+}
+
+function saveManualImageEntry() {
+  const hex = normalizeHex(document.getElementById('manualImageHex').value);
+  const links = manualImageInputs().map(input => input.value.trim()).filter(Boolean);
+  const invalid = links.find(link => !isValidImageUrl(link));
+
+  if (!hex) {
+    document.getElementById('manualImageStatus').textContent = 'Enter an ICAO hex first.';
+    return;
+  }
+  if (invalid) {
+    document.getElementById('manualImageStatus').textContent = 'Image links must be full http:// or https:// URLs.';
+    return;
+  }
+
+  if (links.length) manualImages[hex] = links.slice(0, 4);
+  else delete manualImages[hex];
+
+  const persisted = saveManualImages();
+  resetImageIndex(hex);
+  document.getElementById('updatedPill').textContent = links.length
+    ? `Saved ${links.length} manual image link${links.length === 1 ? '' : 's'} for ${hex}${persisted ? '' : ' (not saved)'}`
+    : `Removed manual image links for ${hex}${persisted ? '' : ' (not saved)'}`;
+
+  populateManualImageSelect(hex);
+  fillManualImageFields(hex);
+  if (modalHex === hex) openModal(hex);
+  preservingScroll(render);
+}
+
+function removeManualImageEntry() {
+  const hex = normalizeHex(document.getElementById('manualImageHex').value);
+  if (!hex) return;
+  delete manualImages[hex];
+  saveManualImages();
+  resetImageIndex(hex);
+  document.getElementById('updatedPill').textContent = `Removed manual image links for ${hex}`;
+  populateManualImageSelect(hex);
+  fillManualImageFields(hex);
+  if (modalHex === hex) openModal(hex);
+  preservingScroll(render);
 }
 
 function datestamp() {
@@ -1511,7 +1775,7 @@ function exportCSV() {
     ? [...baseFields.slice(0, 8), 'tag1','tag2','tag3', ...baseFields.slice(8)]
     : baseFields;
   const header = fields.join(',');
-  const rows = getFiltered().map(p =>
+  const rows = getFiltered().map(withEffectiveImages).map(p =>
     fields.map(f => {
       const v = String(p[f] ?? '');
       return (v.includes(',') || v.includes('"') || v.includes('\n'))
@@ -1523,8 +1787,8 @@ function exportCSV() {
 
 function exportJSON() {
   const items = exportIncludesTags()
-    ? getFiltered()
-    : getFiltered().map(({ tag1, tag2, tag3, ...rest }) => rest);
+    ? getFiltered().map(withEffectiveImages)
+    : getFiltered().map(withEffectiveImages).map(({ tag1, tag2, tag3, ...rest }) => rest);
   triggerDownload(
     JSON.stringify(items, null, 2),
     exportFilename('json'),
@@ -2064,6 +2328,15 @@ function closeModal(e) {
 }
 
 document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'm') {
+    e.preventDefault();
+    openManualImageMenu();
+    return;
+  }
+  if (e.key === 'Escape' && document.getElementById('manualImageMenu').classList.contains('open')) {
+    closeManualImageMenu();
+    return;
+  }
   if (e.key === 'Escape' && document.getElementById('backendDialog').classList.contains('open')) {
     closeBackendDialog();
     return;
@@ -2170,7 +2443,6 @@ function applyBackendBase(newBase) {
   fetchAll(true);
 }
 
-document.getElementById('btnBackend').addEventListener('click', openBackendDialog);
 document.getElementById('backendDialogCancel').addEventListener('click', closeBackendDialog);
 document.getElementById('backendDialogReset').addEventListener('click', () => {
   storeApiBase('');
@@ -2188,6 +2460,30 @@ document.getElementById('backendDialog').addEventListener('click', (e) => {
 });
 document.getElementById('backendDialogInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); document.getElementById('backendDialogSave').click(); }
+});
+
+// Manual image links menu (hidden — open via Ctrl+Shift+M or triple-click on title)
+document.getElementById('appTitle').addEventListener('click', (e) => {
+  if (e.detail >= 3) openManualImageMenu();
+});
+document.getElementById('manualImagePlaneSelect').addEventListener('change', (e) => {
+  fillManualImageFields(e.target.value);
+});
+document.getElementById('manualImageHex').addEventListener('input', (e) => {
+  const hex = normalizeHex(e.target.value);
+  const select = document.getElementById('manualImagePlaneSelect');
+  if (select.value !== hex) select.value = '';
+  fillManualImageFields(hex);
+});
+document.getElementById('manualImageClose').addEventListener('click', closeManualImageMenu);
+document.getElementById('manualImageSave').addEventListener('click', saveManualImageEntry);
+document.getElementById('manualImageRemove').addEventListener('click', removeManualImageEntry);
+document.getElementById('manualImageMenu').addEventListener('click', (e) => {
+  if (e.target.id === 'manualImageMenu') closeManualImageMenu();
+});
+document.getElementById('manualImageBackend').addEventListener('click', () => {
+  closeManualImageMenu();
+  openBackendDialog();
 });
 
 // Export dropdown
@@ -2316,6 +2612,7 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+loadManualImages();
 loadImportedSnapshot();
 fetchAll(false);
 startPolling();
