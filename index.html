@@ -294,6 +294,8 @@
     border-radius: 12px;
     overflow: hidden;
     transition: border-color 0.2s, transform 0.15s;
+    display: flex;
+    flex-direction: column;
   }
 
   .card:hover { border-color: var(--accent); transform: translateY(-2px); }
@@ -483,7 +485,7 @@
     padding: 14px 16px;
     display: flex;
     flex-direction: column;
-    height: 100%;
+    flex: 1;
   }
 
   .card-type {
