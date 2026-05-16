@@ -1101,7 +1101,7 @@
   <div class="modal" id="modalInner">
     <div style="position:relative">
       <div id="modalImgSlot"></div>
-      <button class="modal-close" id="modalCloseBtn" aria-label="Close">&times;</button>
+      <button class="modal-close" id="modalCloseBtn" aria-label="Close"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 3 L13 13 M13 3 L3 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
     </div>
     <div class="modal-body">
       <h2 id="modalType"></h2>
@@ -2651,8 +2651,8 @@ function renderGrid(items) {
       <div class="card-img-wrap">
         ${imgs.length ? imgTag(imgSrc, p) : placeholderTag(p)}
         ${imgs.length > 1 ? `
-          <button class="img-nav left" data-action="img-prev" aria-label="Previous image">&lsaquo;</button>
-          <button class="img-nav right" data-action="img-next" aria-label="Next image">&rsaquo;</button>
+          <button class="img-nav left" data-action="img-prev" aria-label="Previous image"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M10 3 L5 8 L10 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg></button>
+          <button class="img-nav right" data-action="img-next" aria-label="Next image"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M6 3 L11 8 L6 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg></button>
           <div class="card-img-dots">${dots}</div>
         ` : ''}
         <div class="card-category">${esc(p.category)}</div>
