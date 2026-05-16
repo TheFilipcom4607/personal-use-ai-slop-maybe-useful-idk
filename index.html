@@ -479,7 +479,12 @@
   .badge-gov { background: rgba(157, 143, 196, 0.85); color: #fff; }
   .badge-civ { background: rgba(111, 184, 156, 0.85); color: #fff; }
 
-  .card-body { padding: 14px 16px; }
+  .card-body {
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
 
   .card-type {
     font-size: 0.95rem;
@@ -520,7 +525,7 @@
   }
 
   .card-seen {
-    margin-top: 10px;
+    margin-top: auto;
     padding-top: 10px;
     border-top: 1px solid var(--border);
     font-size: 0.75rem;
@@ -1828,10 +1833,12 @@ async function loadServerBackup() {
     if (added) {
       refreshMergedData();
       updateSectionCounts();
+      buildCategoryChips();
+      if (!modalHex) preservingScroll(render);
       const pill = document.getElementById('updatedPill');
       if (pill) pill.textContent = `Loaded ${backupCount()} backup aircraft (incl. server snapshot)`;
     }
-    return true;
+    return added > 0;
   } catch (err) {
     console.info('Server-side backup snapshot unavailable:', err.message);
     return false;
@@ -3198,7 +3205,11 @@ Promise.allSettled([
   loadServerBackup()
 ]).then(results => {
   const gotImages = results[0].status === 'fulfilled' && results[0].value;
-  if (gotImages) preservingScroll(render);
+  const gotBackup = results[1].status === 'fulfilled' && results[1].value;
+  if (gotImages || gotBackup) {
+    buildCategoryChips();
+    if (!modalHex) preservingScroll(render);
+  }
 });
 </script>
 </body>
