@@ -917,6 +917,48 @@
     border-color: var(--accent);
   }
 
+  .manual-image-search-wrap {
+    position: relative;
+  }
+
+  .manual-image-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 4px;
+    z-index: 10;
+    max-height: 260px;
+    overflow-y: auto;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  }
+
+  .manual-image-suggestion {
+    padding: 8px 10px;
+    font-size: 0.85rem;
+    color: var(--text);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .manual-image-suggestion:hover,
+  .manual-image-suggestion.active {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .manual-image-suggestion-empty {
+    padding: 10px;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    text-align: center;
+    cursor: default;
+  }
+
   .manual-image-links {
     display: grid;
     grid-template-columns: 1fr;
@@ -1086,10 +1128,13 @@
 <div class="app-dialog-overlay" id="manualImageMenu" aria-hidden="true">
   <div class="app-dialog manual-image-dialog" role="dialog" aria-modal="true" aria-labelledby="manualImageTitle">
     <h2 id="manualImageTitle">Manual Image Links</h2>
-    <p>Add local image links for aircraft that are missing photos in the image database.</p>
+    <p>Add or replace photos for any aircraft. Your links override the database entry on this device or on the server.</p>
 
-    <label for="manualImagePlaneSelect">Aircraft without database images</label>
-    <select id="manualImagePlaneSelect"></select>
+    <label for="manualImagePlaneSearch">Aircraft</label>
+    <div class="manual-image-search-wrap">
+      <input type="text" id="manualImagePlaneSearch" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Type hex, registration, type, or operator…" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="manualImageSuggestions">
+      <div id="manualImageSuggestions" class="manual-image-suggestions" role="listbox" hidden></div>
+    </div>
 
     <label for="manualImageHex">ICAO hex</label>
     <input type="text" id="manualImageHex" maxlength="8" autocomplete="off" placeholder="A1B2C3">
@@ -1870,7 +1915,7 @@ function fillManualImageFields(hex) {
   let suffix = '';
   if (source === 'local') suffix = ' - using local override';
   else if (source === 'server') suffix = ' - using server entry';
-  else if (storedLinks.length) suffix = ' - database already has links';
+  else if (storedLinks.length) suffix = ' - database has links; saving will override them';
   else suffix = ' - no database image links';
 
   document.getElementById('manualImageStatus').textContent = p
@@ -1878,22 +1923,146 @@ function fillManualImageFields(hex) {
     : normalizedHex ? 'Aircraft not currently loaded; links will still be saved.' : '';
 }
 
-function populateManualImageSelect(selectedHex) {
-  const select = document.getElementById('manualImagePlaneSelect');
-  const selected = normalizeHex(selectedHex);
-  const planes = allKnownPlanes()
-    .filter(p => {
-      const hex = normalizeHex(p.hex || p.icao);
-      return !getStoredImageLinks(p).length || manualImages[hex] || serverManualImages[hex];
-    })
-    .sort((a, b) => describePlane(a).localeCompare(describePlane(b)));
+// Describes a plane as a single search-friendly line shown in the picker.
+// hexFromPickerValue() extracts the leading 6-hex back out when the user picks one.
+function planePickerValue(p) {
+  const hex = normalizeHex(p.hex || p.icao);
+  const src = manualImageSource(hex);
+  let state;
+  if (src === 'local') state = 'local override';
+  else if (src === 'server') state = 'server override';
+  else if (!getStoredImageLinks(p).length) state = 'no photo';
+  else state = 'database';
+  return `${hex} - ${describePlane(p).replace(/^[^-]+-\s*/, '')} (${state})`;
+}
 
-  select.innerHTML = '<option value="">Select a loaded aircraft...</option>' + planes.map(p => {
-    const hex = normalizeHex(p.hex || p.icao);
-    const src = manualImageSource(hex);
-    const suffix = src === 'local' ? ' (local)' : src === 'server' ? ' (server)' : '';
-    return `<option value="${esc(hex)}"${hex === selected ? ' selected' : ''}>${esc(describePlane(p) + suffix)}</option>`;
-  }).join('');
+function hexFromPickerValue(value) {
+  const match = String(value || '').match(/[0-9A-Fa-f]{6}/);
+  return match ? normalizeHex(match[0]) : '';
+}
+
+function planeStateRank(p) {
+  const hex = normalizeHex(p.hex || p.icao);
+  const src = manualImageSource(hex);
+  if (src === 'local') return 0;
+  if (src === 'server') return 1;
+  if (!getStoredImageLinks(p).length) return 2;
+  return 3;
+}
+
+function sortedPickerPlanes() {
+  return allKnownPlanes().sort((a, b) => {
+    const ra = planeStateRank(a);
+    const rb = planeStateRank(b);
+    if (ra !== rb) return ra - rb;
+    return describePlane(a).localeCompare(describePlane(b));
+  });
+}
+
+// Custom autocomplete state — index of the keyboard-highlighted suggestion.
+let manualImageSuggestionIndex = -1;
+
+// Common operator / agency abbreviations. Kept conservative — only entries
+// that are unambiguous and likely to be typed. A token matches a plane if
+// EITHER the literal token OR any of its synonyms appears in the picker line.
+const OPERATOR_SYNONYMS = {
+  // Anglosphere
+  raf:    ['royal air force'],
+  usaf:   ['united states air force', 'us air force'],
+  usn:    ['united states navy', 'us navy'],
+  usmc:   ['united states marine corps', 'us marine corps', 'marines'],
+  uscg:   ['united states coast guard', 'us coast guard', 'coast guard'],
+  usarmy: ['united states army', 'us army'],
+  raaf:   ['royal australian air force'],
+  rnzaf:  ['royal new zealand air force'],
+  rcaf:   ['royal canadian air force'],
+  // Europe
+  rnoaf:  ['royal norwegian air force'],
+  rdaf:   ['royal danish air force'],
+  rnlaf:  ['royal netherlands air force', 'koninklijke luchtmacht'],
+  klu:    ['koninklijke luchtmacht', 'royal netherlands air force'],
+  ada:    ["armee de l'air", 'french air force'],
+  eda:    ['ejercito del aire', 'spanish air force'],
+  poaf:   ['portuguese air force'],
+  baf:    ['belgian air force'],
+  luftwaffe: ['german air force'],
+  bpol:   ['bundespolizei'],
+  // Asia & Middle East
+  jasdf:  ['japan air self', 'japanese air self'],
+  rokaf:  ['republic of korea air force', 'south korean air force'],
+  plaaf:  ['people\'s liberation army air force', 'chinese air force'],
+};
+
+function expandSynonymTokens(tokens) {
+  return tokens.map(t => {
+    const extras = OPERATOR_SYNONYMS[t] || [];
+    return [t, ...extras];
+  });
+}
+
+function manualImagePickerMatches(query) {
+  const tokens = String(query || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const expanded = expandSynonymTokens(tokens);
+  const planes = sortedPickerPlanes();
+  const out = [];
+  for (const p of planes) {
+    const value = planePickerValue(p);
+    const hay = value.toLowerCase();
+    if (!expanded.length || expanded.every(forms => forms.some(f => hay.includes(f)))) {
+      out.push(value);
+      if (out.length >= 60) break;
+    }
+  }
+  return out;
+}
+
+function showManualImageSuggestions() {
+  const search = document.getElementById('manualImagePlaneSearch');
+  const box = document.getElementById('manualImageSuggestions');
+  const matches = manualImagePickerMatches(search.value);
+
+  if (!matches.length) {
+    box.innerHTML = `<div class="manual-image-suggestion-empty">No matches</div>`;
+  } else {
+    box.innerHTML = matches.map((value, i) =>
+      `<div class="manual-image-suggestion${i === manualImageSuggestionIndex ? ' active' : ''}" role="option" data-value="${esc(value)}" data-index="${i}">${esc(value)}</div>`
+    ).join('');
+  }
+  box.hidden = false;
+  search.setAttribute('aria-expanded', 'true');
+}
+
+function hideManualImageSuggestions() {
+  const box = document.getElementById('manualImageSuggestions');
+  box.hidden = true;
+  manualImageSuggestionIndex = -1;
+  document.getElementById('manualImagePlaneSearch').setAttribute('aria-expanded', 'false');
+}
+
+function pickManualImageSuggestion(value) {
+  const search = document.getElementById('manualImagePlaneSearch');
+  search.value = value;
+  const hex = hexFromPickerValue(value);
+  if (hex) fillManualImageFields(hex);
+  hideManualImageSuggestions();
+}
+
+// Kept under the original name so all existing callers continue to work — it
+// now just syncs the picker's search box to whichever plane is targeted.
+function populateManualImageSelect(selectedHex) {
+  const searchInput = document.getElementById('manualImagePlaneSearch');
+  const selected = normalizeHex(selectedHex);
+  if (selected) {
+    const p = findPlane(selected);
+    searchInput.value = p ? planePickerValue(p) : selected;
+  } else {
+    searchInput.value = '';
+  }
+  // If the suggestions are open, refresh them so state annotations stay live
+  // after a save/remove.
+  if (!document.getElementById('manualImageSuggestions').hidden) {
+    showManualImageSuggestions();
+  }
 }
 
 function openManualImageMenu(hex) {
@@ -1911,6 +2080,7 @@ function closeManualImageMenu() {
   const overlay = document.getElementById('manualImageMenu');
   overlay.classList.remove('open');
   overlay.setAttribute('aria-hidden', 'true');
+  hideManualImageSuggestions();
 }
 
 function isValidImageUrl(url) {
@@ -2786,14 +2956,76 @@ document.getElementById('backendDialogInput').addEventListener('keydown', (e) =>
 document.getElementById('appTitle').addEventListener('click', (e) => {
   if (e.detail >= 3) openManualImageMenu();
 });
-document.getElementById('manualImagePlaneSelect').addEventListener('change', (e) => {
-  fillManualImageFields(e.target.value);
-});
+(() => {
+  const search = document.getElementById('manualImagePlaneSearch');
+  const box = document.getElementById('manualImageSuggestions');
+
+  search.addEventListener('focus', () => {
+    manualImageSuggestionIndex = -1;
+    showManualImageSuggestions();
+  });
+
+  search.addEventListener('input', () => {
+    manualImageSuggestionIndex = -1;
+    showManualImageSuggestions();
+    const hex = hexFromPickerValue(search.value);
+    if (hex) fillManualImageFields(hex);
+  });
+
+  search.addEventListener('keydown', (e) => {
+    const items = Array.from(box.querySelectorAll('.manual-image-suggestion'));
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (box.hidden) { showManualImageSuggestions(); return; }
+      if (!items.length) return;
+      manualImageSuggestionIndex = (manualImageSuggestionIndex + 1) % items.length;
+      showManualImageSuggestions();
+      box.querySelector('.manual-image-suggestion.active')?.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!items.length) return;
+      manualImageSuggestionIndex = (manualImageSuggestionIndex - 1 + items.length) % items.length;
+      showManualImageSuggestions();
+      box.querySelector('.manual-image-suggestion.active')?.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      const active = box.querySelector('.manual-image-suggestion.active');
+      if (active) {
+        e.preventDefault();
+        pickManualImageSuggestion(active.dataset.value);
+      }
+    } else if (e.key === 'Escape') {
+      if (!box.hidden) {
+        e.preventDefault();
+        e.stopPropagation();
+        hideManualImageSuggestions();
+      }
+    }
+  });
+
+  // mousedown (not click) so we fire before the input's blur, which prevents
+  // the user-agent from dismissing things underneath us.
+  box.addEventListener('mousedown', (e) => {
+    const item = e.target.closest('.manual-image-suggestion');
+    if (!item) return;
+    e.preventDefault();
+    pickManualImageSuggestion(item.dataset.value);
+  });
+
+  // Click anywhere outside the picker → close.
+  document.addEventListener('mousedown', (e) => {
+    if (box.hidden) return;
+    if (e.target.closest('.manual-image-search-wrap')) return;
+    hideManualImageSuggestions();
+  });
+})();
+
 document.getElementById('manualImageHex').addEventListener('input', (e) => {
   const hex = normalizeHex(e.target.value);
-  const select = document.getElementById('manualImagePlaneSelect');
-  if (select.value !== hex) select.value = '';
   fillManualImageFields(hex);
+  // Keep the picker search box in sync so it doesn't lie about which plane is targeted.
+  const search = document.getElementById('manualImagePlaneSearch');
+  const p = hex ? findPlane(hex) : null;
+  search.value = p ? planePickerValue(p) : hex;
 });
 document.getElementById('manualImageClose').addEventListener('click', closeManualImageMenu);
 document.getElementById('manualImageSave').addEventListener('click', saveManualImageEntry);
@@ -2849,6 +3081,11 @@ document.getElementById('modalCloseBtn').addEventListener('click', () => closeMo
 document.getElementById('modalThumbs').addEventListener('click', (e) => {
   const img = e.target.closest('img[data-url]');
   if (img) selectModalImg(img, img.dataset.url);
+});
+// Hidden gesture: triple-click the main modal photo to edit photos for this plane.
+// Mirrors the triple-click-title gesture for the global menu.
+document.getElementById('modalImgSlot').addEventListener('click', (e) => {
+  if (e.detail >= 3 && modalHex) openManualImageMenu(modalHex);
 });
 
 // Auto-collapse header on mobile when scrolling down, expand on scroll up.
