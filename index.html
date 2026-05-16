@@ -488,6 +488,12 @@
     flex: 1;
   }
 
+  /* Keep the original spacing above the seen-row, on top of margin-top:auto */
+  .card-tags { margin-bottom: 10px; }
+
+  /* Breathing room below the timestamp so it doesn't hug the card edge */
+  .card-body > .card-seen { padding-bottom: 4px; }
+
   .card-type {
     font-size: 0.95rem;
     font-weight: 700;
