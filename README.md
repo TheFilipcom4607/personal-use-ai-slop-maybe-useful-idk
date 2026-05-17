@@ -27,6 +27,7 @@ It's also optimised for mobile since that was my main priority.
 - Manual per-aircraft image links via a hidden menu (Ctrl+Shift+M, or triple-click the title), saved either locally or on the Pi for everyone.
 - One-click JetPhotos lookup by registration and Google search by ICAO hex from inside the manual-image menu.
 - Optional Tailscale-friendly backend URL override for accessing the GUI from outside the local network.
+- Optional "Update from GitHub" button in the hidden menu that pulls the latest `index.html` from `main` and reloads, so you don't need to ssh in to deploy a change (requires the Flask sidecar, see [server/README.md](server/README.md)).
 - Optional import enrichment from [plane-alert-db](https://github.com/sdr-enthusiasts/plane-alert-db):
   - pull missing image links from `plane_images.csv`
   - pull missing tags and metadata from `plane-alert-db.csv`
@@ -73,3 +74,14 @@ Note: if you access the GUI over HTTPS (e.g. via Tailscale Serve with TLS), the 
 By default, manual image links and imported backups live in the browser's local storage and don't follow you to other devices. If you want them shared across every browser hitting the Pi, install the small Flask sidecar and add a one-line nginx proxy. The GUI then prompts *Local only* / *Save on server* whenever you save a manual image or import a backup.
 
 Setup is documented in [server/README.md](server/README.md). It's strictly optional: without it the GUI works exactly as before and silently skips the server fetch.
+
+## Self-updating from GitHub (optional)
+
+If the Flask sidecar above is installed, the hidden menu also gets an *Update from GitHub…* button. Clicking it asks the sidecar to download the latest `index.html` from this repo's `main` branch and atomically swap it into `/opt/funplaneviewer/index.html` (the previous version is kept as `index.html.bak`), then reloads the page. Handy for pushing GUI tweaks from a laptop without ssh'ing to the Pi.
+
+One-time setup on the Pi, on top of the sidecar install:
+
+1. Give the service user ownership of the index file and its parent dir, so the atomic rename works without sudo: `sudo chown funplaneviewer:funplaneviewer /opt/funplaneviewer /opt/funplaneviewer/index.html`.
+2. The shipped systemd unit already lists `/opt/funplaneviewer` under `ReadWritePaths=`, so if you copied an older unit, refresh it from this repo and `sudo systemctl daemon-reload && sudo systemctl restart funplaneviewer-uploads`.
+
+The source URL is fixed in the sidecar's environment (defaults to this repo's `main`), so the endpoint can't be coerced into writing arbitrary content. Override with `FUNPLANEVIEWER_UPDATE_URL=` in the unit if you fork.
