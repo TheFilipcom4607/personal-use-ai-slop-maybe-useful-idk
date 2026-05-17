@@ -1009,6 +1009,14 @@
     border-top: 1px solid var(--border);
   }
 
+  .app-version {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+    user-select: text;
+  }
+
   .manual-image-jetphotos-row {
     margin-top: 8px;
     display: flex;
@@ -1185,7 +1193,7 @@
     <div class="app-dialog-actions" style="justify-content: flex-start; gap: 8px; flex-wrap: wrap; align-items: center;">
       <button class="btn" type="button" id="manualImageBackend" title="Change SkyStats backend URL (for Tailscale or remote access)">Change backend URL…</button>
       <button class="btn" type="button" id="manualImageSelfUpdate" title="Pull the latest index.html from GitHub main and reload">Update from GitHub…</button>
-      <span style="opacity: 0.6; font-size: 12px;">test v3</span>
+      <span class="app-version" title="App version (bump in index.html when releasing)">v1.0.0</span>
     </div>
   </div>
 </div>
