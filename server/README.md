@@ -53,7 +53,10 @@ curl -fsS http://127.0.0.1:5174/api/uploads/health
 # 4. nginx proxy
 sudo cp server/nginx-snippet.conf /etc/nginx/snippets/funplaneviewer-uploads.conf
 # Then `include snippets/funplaneviewer-uploads.conf;` inside the relevant
-# `server { ... }` block, or paste the snippet directly.
+# `server { ... }` block, or paste the snippet directly. The snippet
+# also adds Cache-Control: no-cache to `/` and `/index.html` so the
+# self-update button's reload reliably picks up the new bytes; if you
+# already had a custom `location = /` block, merge the headers in.
 sudo nginx -t && sudo systemctl reload nginx
 
 # 5. From your laptop, hitting the Pi:

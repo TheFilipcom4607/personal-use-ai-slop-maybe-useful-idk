@@ -16,10 +16,12 @@ No auth: meant to sit behind nginx on a LAN/Tailscale-only host.
 """
 
 import csv
+import hashlib
 import io
 import json
 import os
 import threading
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -237,9 +239,25 @@ def self_update():
     """Fetch the latest index.html from $UPDATE_URL and atomically
     replace the local file, keeping the previous version as
     `index.html.bak`. Source URL is fixed in env, never read from the
-    request body."""
+    request body.
+
+    raw.githubusercontent.com caches responses at the CDN edge for a
+    few minutes, so we append a cache-buster query param and send
+    no-cache request headers. The response includes the sha256 of
+    what we wrote, which lets the client verify whether a stale
+    layer (CDN, browser, nginx) is still in play."""
+    bust_sep = "&" if "?" in UPDATE_URL else "?"
+    bust_url = f"{UPDATE_URL}{bust_sep}_={int(time.time())}"
+    req = urllib.request.Request(
+        bust_url,
+        headers={
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+            "User-Agent": "funplaneviewer-self-update/1",
+        },
+    )
     try:
-        with urllib.request.urlopen(UPDATE_URL, timeout=UPDATE_TIMEOUT) as resp:
+        with urllib.request.urlopen(req, timeout=UPDATE_TIMEOUT) as resp:
             body = resp.read(UPDATE_MAX_BYTES + 1)
     except (urllib.error.URLError, TimeoutError, OSError) as err:
         return jsonify(ok=False, error=f"download failed: {err}"), 502
@@ -252,6 +270,7 @@ def self_update():
     if b"<html" not in head and b"<!doctype html" not in head:
         return jsonify(ok=False, error="downloaded content doesn't look like HTML"), 502
 
+    digest = hashlib.sha256(body).hexdigest()
     target = INDEX_HTML
     new_path = target.parent / (target.name + ".new")
     bak_path = target.parent / (target.name + ".bak")
@@ -266,7 +285,7 @@ def self_update():
         except OSError as err:
             return jsonify(ok=False, error=f"write failed: {err}"), 500
 
-    return jsonify(ok=True, bytes=len(body), source=UPDATE_URL)
+    return jsonify(ok=True, bytes=len(body), sha256=digest, source=bust_url)
 
 
 if __name__ == "__main__":

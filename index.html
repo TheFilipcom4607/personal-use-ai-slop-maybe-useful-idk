@@ -1193,7 +1193,7 @@
     <div class="app-dialog-actions" style="justify-content: flex-start; gap: 8px; flex-wrap: wrap; align-items: center;">
       <button class="btn" type="button" id="manualImageBackend" title="Change SkyStats backend URL (for Tailscale or remote access)">Change backend URL…</button>
       <button class="btn" type="button" id="manualImageSelfUpdate" title="Pull the latest index.html from GitHub main and reload">Update from GitHub…</button>
-      <span class="app-version" title="App version (bump in index.html when releasing)">v1.8.0</span>
+      <span class="app-version" title="App version (bump in index.html when releasing)">v1.8.1</span>
     </div>
   </div>
 </div>
@@ -3081,13 +3081,20 @@ document.getElementById('manualImageSelfUpdate').addEventListener('click', async
     'Update', 'Cancel');
   if (!ok) return;
   try {
-    const res = await fetch(`${UPLOADS_API_BASE}/self-update`, { method: 'POST' });
+    const res = await fetch(`${UPLOADS_API_BASE}/self-update`, {
+      method: 'POST',
+      cache: 'no-store',
+    });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
-    // Cache-bust the reload: browsers often serve the cached HTML on a
-    // plain reload, hiding the just-replaced index.html.
+    // Cache-bust the reload. Browsers often hand back the cached HTML
+    // on a plain reload, hiding the just-replaced index.html. Append
+    // the sha256 of what the sidecar wrote so the URL also changes
+    // when the content does, and clear any existing buster first so
+    // we don't accumulate stale ones.
     const url = new URL(location.href);
-    url.searchParams.set('u', Date.now().toString(36));
+    url.searchParams.delete('u');
+    url.searchParams.set('v', (data.sha256 || Date.now().toString(36)).slice(0, 12));
     location.replace(url.toString());
   } catch (err) {
     appAlert('Update failed', String(err && err.message || err));
