@@ -20,6 +20,8 @@ import io
 import json
 import os
 import threading
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 from flask import Flask, abort, jsonify, request, send_file
@@ -29,6 +31,19 @@ IMAGES_CSV = DATA_DIR / "images.csv"
 BACKUP_JSON = DATA_DIR / "backup.json"
 PORT = int(os.environ.get("PORT", "5174"))
 HOST = os.environ.get("HOST", "127.0.0.1")
+
+# Self-update: pull the static GUI from GitHub and atomically replace
+# the index.html that nginx serves. URL is hardcoded server-side on
+# purpose — never accept it from the client.
+INDEX_HTML = Path(os.environ.get(
+    "FUNPLANEVIEWER_INDEX_HTML", "/opt/funplaneviewer/index.html"))
+UPDATE_URL = os.environ.get(
+    "FUNPLANEVIEWER_UPDATE_URL",
+    "https://raw.githubusercontent.com/TheFilipcom4607/personal-use-ai-slop-maybe-useful-idk/main/index.html",
+)
+UPDATE_TIMEOUT = int(os.environ.get("FUNPLANEVIEWER_UPDATE_TIMEOUT", "20"))
+UPDATE_MIN_BYTES = 10 * 1024
+UPDATE_MAX_BYTES = 10 * 1024 * 1024
 
 CSV_HEADER = ["$ICAO", "$Registration", "#ImageLink", "#ImageLink2", "#ImageLink3", "#ImageLink4"]
 
@@ -215,6 +230,43 @@ def delete_backup():
         if BACKUP_JSON.exists():
             BACKUP_JSON.unlink()
     return jsonify(ok=True)
+
+
+@app.post("/api/uploads/self-update")
+def self_update():
+    """Fetch the latest index.html from $UPDATE_URL and atomically
+    replace the local file, keeping the previous version as
+    `index.html.bak`. Source URL is fixed in env, never read from the
+    request body."""
+    try:
+        with urllib.request.urlopen(UPDATE_URL, timeout=UPDATE_TIMEOUT) as resp:
+            body = resp.read(UPDATE_MAX_BYTES + 1)
+    except (urllib.error.URLError, TimeoutError, OSError) as err:
+        return jsonify(ok=False, error=f"download failed: {err}"), 502
+
+    if len(body) > UPDATE_MAX_BYTES:
+        return jsonify(ok=False, error="downloaded file exceeds size limit"), 502
+    if len(body) < UPDATE_MIN_BYTES:
+        return jsonify(ok=False, error=f"downloaded file is suspiciously small ({len(body)} bytes)"), 502
+    head = body[:512].lower()
+    if b"<html" not in head and b"<!doctype html" not in head:
+        return jsonify(ok=False, error="downloaded content doesn't look like HTML"), 502
+
+    target = INDEX_HTML
+    new_path = target.parent / (target.name + ".new")
+    bak_path = target.parent / (target.name + ".bak")
+    with _lock:
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with new_path.open("wb") as fh:
+                fh.write(body)
+            if target.exists():
+                target.replace(bak_path)
+            new_path.replace(target)
+        except OSError as err:
+            return jsonify(ok=False, error=f"write failed: {err}"), 500
+
+    return jsonify(ok=True, bytes=len(body), source=UPDATE_URL)
 
 
 if __name__ == "__main__":

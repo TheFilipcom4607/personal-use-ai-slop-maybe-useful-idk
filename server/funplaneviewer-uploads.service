@@ -28,7 +28,10 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/opt/funplaneviewer/data
+# `/opt/funplaneviewer` is writable so the self-update endpoint can
+# replace `index.html`. The service user still needs filesystem
+# ownership of that path — see server/README.md.
+ReadWritePaths=/opt/funplaneviewer /opt/funplaneviewer/data
 
 [Install]
 WantedBy=multi-user.target

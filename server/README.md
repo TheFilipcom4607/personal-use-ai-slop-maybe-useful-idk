@@ -23,6 +23,7 @@ just talks to the page's own origin.
 | GET    | `/api/uploads/backup.json`        | Stored snapshot, or empty `{ mil:[], gov:[], civ:[] }` |
 | POST   | `/api/uploads/backup`             | Whole-snapshot replace, body matches client export shape |
 | DELETE | `/api/uploads/backup`             | Wipes the stored snapshot                      |
+| POST   | `/api/uploads/self-update`        | Pulls `index.html` from `$FUNPLANEVIEWER_UPDATE_URL` (defaults to GitHub `main`) and atomically replaces `/opt/funplaneviewer/index.html`, keeping the previous version as `index.html.bak`. No body. |
 
 No auth, assumes LAN/Tailscale-only access (matches the existing
 SkyStats backend on `:5173`).
@@ -34,6 +35,9 @@ SkyStats backend on `:5173`).
 sudo useradd --system --no-create-home --shell /usr/sbin/nologin funplaneviewer
 sudo mkdir -p /opt/funplaneviewer/server /opt/funplaneviewer/data
 sudo chown funplaneviewer:funplaneviewer /opt/funplaneviewer/data
+# Allow the service to replace index.html via the self-update endpoint.
+# The parent dir must be writable for the atomic rename.
+sudo chown funplaneviewer:funplaneviewer /opt/funplaneviewer /opt/funplaneviewer/index.html 2>/dev/null || true
 
 # 2. App + Flask
 sudo cp server/funplaneviewer_uploads.py /opt/funplaneviewer/server/
@@ -72,5 +76,8 @@ A single global lock serializes writes, which is fine at this traffic level.
 - Different storage dir: set `FUNPLANEVIEWER_DATA_DIR` in the unit's
   `Environment=` and update `ReadWritePaths=`.
 - Different port: set `PORT=` in the unit and update the nginx snippet.
+- Different self-update source: set `FUNPLANEVIEWER_UPDATE_URL=` (raw URL
+  to an `index.html`) or `FUNPLANEVIEWER_INDEX_HTML=` (target path) in
+  the unit.
 - Want auth: add an `X-Upload-Token` header check in
   `funplaneviewer_uploads.py` and have the GUI send it.
