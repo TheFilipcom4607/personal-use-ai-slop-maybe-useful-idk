@@ -2701,7 +2701,7 @@ function renderGrid(items) {
 function renderTable(items) {
   const fresh = newHexes[activeSection] || new Set();
   const rows = items.map(p => {
-    const img = p.image_link_1;
+    const img = getImages(p)[0] || '';
     const grp = (p.group || '').toLowerCase();
     const badgeClass = grp === 'gov' ? 'badge-gov' : grp === 'civ' ? 'badge-civ' : 'badge-mil';
     const badgeLabel = grp === 'gov' ? 'GOV' : grp === 'civ' ? 'CIV' : 'MIL';
