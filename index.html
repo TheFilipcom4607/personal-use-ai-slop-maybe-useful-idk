@@ -1185,7 +1185,7 @@
     <div class="app-dialog-actions" style="justify-content: flex-start; gap: 8px; flex-wrap: wrap; align-items: center;">
       <button class="btn" type="button" id="manualImageBackend" title="Change SkyStats backend URL (for Tailscale or remote access)">Change backend URL…</button>
       <button class="btn" type="button" id="manualImageSelfUpdate" title="Pull the latest index.html from GitHub main and reload">Update from GitHub…</button>
-      <span style="opacity: 0.6; font-size: 12px;">test v1</span>
+      <span style="opacity: 0.6; font-size: 12px;">test v2</span>
     </div>
   </div>
 </div>
@@ -3062,25 +3062,22 @@ document.getElementById('manualImageBackend').addEventListener('click', () => {
   closeManualImageMenu();
   openBackendDialog();
 });
-document.getElementById('manualImageSelfUpdate').addEventListener('click', async (e) => {
-  const btn = e.currentTarget;
-  const status = document.getElementById('manualImageStatus');
+document.getElementById('manualImageSelfUpdate').addEventListener('click', async () => {
+  // Close the secret menu first: appDialog and manualImageMenu share a
+  // z-index, and the menu is later in the DOM, so the confirm dialog
+  // would otherwise paint behind it.
+  closeManualImageMenu();
   const ok = await appConfirm(
     'Update from GitHub',
     'Replace index.html on the server with the latest from GitHub main and reload this page?',
     'Update', 'Cancel');
   if (!ok) return;
-  btn.disabled = true;
-  status.textContent = 'Downloading latest index.html…';
   try {
     const res = await fetch(`${UPLOADS_API_BASE}/self-update`, { method: 'POST' });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
-    status.textContent = `Updated (${data.bytes} bytes). Reloading…`;
-    setTimeout(() => location.reload(), 600);
+    location.reload();
   } catch (err) {
-    btn.disabled = false;
-    status.textContent = '';
     appAlert('Update failed', String(err && err.message || err));
   }
 });
