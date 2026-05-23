@@ -12,76 +12,77 @@ It's also optimised for mobile since that was my main priority.
 
 ## Features
 
-- Military, government, and civilian aircraft tabs using the SkyStats interesting-aircraft endpoints.
-- Grid and table views for browsing a larger aircraft history.
+**Browsing**
+- Military, government, and civilian tabs backed by the SkyStats interesting-aircraft endpoints.
+- Grid and table views for stepping through a large aircraft history.
 - Search across type, operator, callsign, ICAO, registration, category, and tags.
-- Sort by last seen, type, operator, and category.
+- Sort by last seen, type, operator, or category.
 - Category filter chips with live counts.
 - Aircraft detail modal with image gallery, tags, metadata, and last-seen time.
 - Image fallback cards for aircraft without photos.
 - 24-hour time formatting.
+- Mobile-friendly layout with a collapsing header.
+
+**Import and export**
 - CSV export for the current filtered list, with an "include tags" toggle.
 - CSV and JSON import for restoring backups.
 - Imported backups are merged into the live receiver feed instead of replacing it.
 - Imported backup data persists locally in the browser, with optional shared persistence on the Pi (see [server/README.md](server/README.md)).
-- Manual per-aircraft image links via a hidden menu (Ctrl+Shift+M, or triple-click the title), saved either locally or on the Pi for everyone.
-- One-click JetPhotos lookup by registration and Google search by ICAO hex from inside the manual-image menu.
-- Optional Tailscale-friendly backend URL override for accessing the GUI from outside the local network.
-- Optional "Update from GitHub" button in the hidden menu that pulls the latest `index.html` from `main` and reloads, so you don't need to ssh in to deploy a change (requires the Flask sidecar, see [server/README.md](server/README.md)).
 - Optional import enrichment from [plane-alert-db](https://github.com/sdr-enthusiasts/plane-alert-db):
-  - pull missing image links from `plane_images.csv`
-  - pull missing tags and metadata from `plane-alert-db.csv`
+  - pulls missing image links from `plane_images.csv`
+  - pulls missing tags and metadata from `plane-alert-db.csv`
 - In-app import prompts instead of browser popups.
-- Mobile-friendly layout with a collapsing header.
+
+**Hidden menu (Ctrl+Shift+M, or triple-click the title)**
+- Add manual per-aircraft image links, saved either locally or on the Pi for everyone.
+- One-click JetPhotos lookup by registration and Google search by ICAO hex.
+- Optional Tailscale-friendly backend URL override for accessing the GUI from outside the local network.
+- Optional "Update from GitHub" button that pulls the latest `index.html` from `main` and reloads, so you don't need to ssh in to deploy a change (requires the Flask sidecar, see [server/README.md](server/README.md)).
 
 ## Setup
 
-The backend defaults to returning only 5 planes, so you need to change that before this GUI is useful. There are two ways to do it:
+The SkyStats backend defaults to returning only 5 planes, so you need to raise that limit before this GUI is useful. Pick one of the two options below.
 
-**Option A - Python script (recommended):**
+### Option A: Python script (recommended)
+
 1. Install dependencies: `pip install requests colorama`
 2. Run `patch.py`
-3. Enter your feeder URL when prompted (default is `adsb-feeder.local:5173`)
-4. Enter the limit you want to set (default is `9999`)
-5. If the request succeeds, you're all set.
+3. Enter your feeder URL when prompted (default `adsb-feeder.local:5173`)
+4. Enter the limit you want to set (default `9999`)
+5. If the request succeeds, you're done.
 
-**Option B - Manual:**
-1. Open SkyStats and go to Settings
-2. Open your browser's network tab (F12 > Network)
-3. Change the "Interesting Aircraft - Number of rows to display" setting to any number (the exact value doesn't matter)
-4. Find the request that was triggered, right-click it, and copy it as cURL
-5. Paste it into an API client like Postman
-6. In the request body, set `interesting_table_limit` to a large number like `99999`. The full body should look like this:
+### Option B: Manual
 
-```json
-{"route_table_limit":"5","interesting_table_limit":"99999","record_holder_table_limit":"5","disable_planealertdb_tags":"false"}
-```
+1. Open SkyStats and go to Settings.
+2. Open your browser's network tab (F12 then Network).
+3. Change "Interesting Aircraft - Number of rows to display" to any value (the exact number doesn't matter).
+4. Find the request that was triggered, right-click it, and copy as cURL.
+5. Paste it into an API client like Postman.
+6. In the request body, set `interesting_table_limit` to a large number like `99999`. The full body should look like:
 
-7. Send the request. If it succeeds, you're all set.
+   ```json
+   {"route_table_limit":"5","interesting_table_limit":"99999","record_holder_table_limit":"5","disable_planealertdb_tags":"false"}
+   ```
 
-## Accessing over Tailscale (or remote networks)
+7. Send the request. If it succeeds, you're done.
 
-By default, the GUI talks to the SkyStats backend at the same hostname the page was loaded from, on port `5173`. So if you open the GUI via your feeder's Tailscale hostname (or its tailnet IP), the API calls automatically go over Tailscale too, no extra configuration needed, as long as port `5173` is reachable on that host over the tailnet.
+## Accessing over Tailscale or other remote networks
 
-If your setup needs a different backend address (for example, the GUI is hosted on a different machine than the feeder, or you're proxying SkyStats through Tailscale Serve), open the hidden manual-image menu (Ctrl+Shift+M, or triple-click the title) and click *Change backend URL…* at the bottom, then enter the full URL (e.g. `http://my-feeder.tailnet-name.ts.net:5173` or `https://feeder.tailnet-name.ts.net`). The value is stored in your browser's local storage and used for all subsequent requests. Click *Reset to default* to go back to the automatic behavior.
+By default the GUI talks to the SkyStats backend at the same hostname the page was loaded from, on port `5173`. If you open the GUI via your feeder's Tailscale hostname or tailnet IP, the API calls automatically go over Tailscale too, as long as port `5173` is reachable on that host.
 
-If the GUI loads but the aircraft list doesn't, the error message will include a *Change backend URL* button that opens the same dialog.
+If your setup needs a different backend address (for example, the GUI is hosted on a different machine than the feeder, or you're proxying SkyStats through Tailscale Serve), open the hidden menu (Ctrl+Shift+M, or triple-click the title), click *Change backend URL…* at the bottom, and enter the full URL, for example:
 
-Note: if you access the GUI over HTTPS (e.g. via Tailscale Serve with TLS), the backend URL also needs to be HTTPS, browsers block mixed HTTP/HTTPS requests.
+- `http://my-feeder.tailnet-name.ts.net:5173`
+- `https://feeder.tailnet-name.ts.net`
 
-## Server-side persistence (optional)
+The value is stored in your browser's local storage and used for all subsequent requests. Click *Reset to default* to go back to the automatic behavior.
 
-By default, manual image links and imported backups live in the browser's local storage and don't follow you to other devices. If you want them shared across every browser hitting the Pi, install the small Flask sidecar and add a one-line nginx proxy. The GUI then prompts *Local only* / *Save on server* whenever you save a manual image or import a backup.
+If the GUI loads but the aircraft list doesn't, the error message includes a *Change backend URL* button that opens the same dialog.
 
-Setup is documented in [server/README.md](server/README.md). It's strictly optional: without it the GUI works exactly as before and silently skips the server fetch.
+> Note: if you access the GUI over HTTPS (for example via Tailscale Serve with TLS), the backend URL also needs to be HTTPS. Browsers block mixed HTTP/HTTPS requests.
 
-## Self-updating from GitHub (optional)
+## Optional Flask sidecar
 
-If the Flask sidecar above is installed, the hidden menu also gets an *Update from GitHub…* button. Clicking it asks the sidecar to download the latest `index.html` from this repo's `main` branch and atomically swap it into `/opt/funplaneviewer/index.html` (the previous version is kept as `index.html.bak`), then reloads the page. Handy for pushing GUI tweaks from a laptop without ssh'ing to the Pi.
+A small Flask sidecar adds shared server-side persistence for manual image links and imported backups, plus a self-update button in the hidden menu that pulls the latest `index.html` from GitHub. It's strictly optional; without it the GUI works exactly as before.
 
-One-time setup on the Pi, on top of the sidecar install:
-
-1. Give the service user ownership of the index file and its parent dir, so the atomic rename works without sudo: `sudo chown funplaneviewer:funplaneviewer /opt/funplaneviewer /opt/funplaneviewer/index.html`.
-2. The shipped systemd unit already lists `/opt/funplaneviewer` under `ReadWritePaths=`, so if you copied an older unit, refresh it from this repo and `sudo systemctl daemon-reload && sudo systemctl restart funplaneviewer-uploads`.
-
-The source URL is fixed in the sidecar's environment (defaults to this repo's `main`), so the endpoint can't be coerced into writing arbitrary content. Override with `FUNPLANEVIEWER_UPDATE_URL=` in the unit if you fork.
+See [server/README.md](server/README.md) for setup.
