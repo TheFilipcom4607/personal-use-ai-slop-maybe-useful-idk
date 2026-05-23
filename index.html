@@ -2844,11 +2844,6 @@ function closeModal(e) {
 }
 
 document.addEventListener('keydown', e => {
-  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'm') {
-    e.preventDefault();
-    openManualImageMenu();
-    return;
-  }
   if (e.key === 'Escape' && document.getElementById('manualImageMenu').classList.contains('open')) {
     closeManualImageMenu();
     return;
@@ -2985,7 +2980,7 @@ document.getElementById('backendDialogInput').addEventListener('keydown', (e) =>
   if (e.key === 'Enter') { e.preventDefault(); document.getElementById('backendDialogSave').click(); }
 });
 
-// Manual image links menu (hidden, open via Ctrl+Shift+M or triple-click on title)
+// Manual image links menu (hidden, open via triple-click on title)
 document.getElementById('appTitle').addEventListener('click', (e) => {
   if (e.detail >= 3) openManualImageMenu();
 });

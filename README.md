@@ -33,7 +33,7 @@ It's also optimised for mobile since that was my main priority.
   - pulls missing tags and metadata from `plane-alert-db.csv`
 - In-app import prompts instead of browser popups.
 
-**Hidden menu (Ctrl+Shift+M, or triple-click the title)**
+**Hidden menu (triple-click the title)**
 - Add manual per-aircraft image links, saved either locally or on the Pi for everyone.
 - One-click JetPhotos lookup by registration and Google search by ICAO hex.
 - Optional Tailscale-friendly backend URL override for accessing the GUI from outside the local network.
@@ -70,7 +70,7 @@ The SkyStats backend defaults to returning only 5 planes, so you need to raise t
 
 By default the GUI talks to the SkyStats backend at the same hostname the page was loaded from, on port `5173`. If you open the GUI via your feeder's Tailscale hostname or tailnet IP, the API calls automatically go over Tailscale too, as long as port `5173` is reachable on that host.
 
-If your setup needs a different backend address (for example, the GUI is hosted on a different machine than the feeder, or you're proxying SkyStats through Tailscale Serve), open the hidden menu (Ctrl+Shift+M, or triple-click the title), click *Change backend URL…* at the bottom, and enter the full URL, for example:
+If your setup needs a different backend address (for example, the GUI is hosted on a different machine than the feeder, or you're proxying SkyStats through Tailscale Serve), open the hidden menu (triple-click the title), click *Change backend URL…* at the bottom, and enter the full URL, for example:
 
 - `http://my-feeder.tailnet-name.ts.net:5173`
 - `https://feeder.tailnet-name.ts.net`
