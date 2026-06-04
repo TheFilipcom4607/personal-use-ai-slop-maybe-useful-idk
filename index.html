@@ -430,6 +430,57 @@
     min-width: 2px;
   }
 
+  /* Stats sub-view switch (backend feeds vs. your logged aircraft) */
+  .stats-subtabs { display: flex; }
+  .stats-subtabs .seg { width: 100%; }
+  .stats-subtabs .seg button { flex: 1; padding: 8px 12px; font-size: 0.82rem; }
+
+  .stat-facts {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 7px 12px;
+    font-size: 0.82rem;
+  }
+  .stat-facts dt { color: var(--text-dim); }
+  .stat-facts dd {
+    text-align: right;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Compact column chart for time-of-day / day-of-week patterns */
+  .colchart-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 92px;
+  }
+  .colchart-bars .col {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    height: 100%;
+  }
+  .colchart-bars .colbar {
+    width: 100%;
+    background: var(--stats);
+    border-radius: 3px 3px 0 0;
+  }
+  /* Wider columns (e.g. the 7-day chart) get a bit more breathing room. */
+  .colchart-bars.sparse { gap: 8px; }
+  .colchart-labels { display: flex; gap: 3px; margin-top: 6px; }
+  .colchart-labels.sparse { gap: 8px; }
+  .colchart-labels .collabel {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+    font-size: 0.62rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
   /* Table */
   .table-wrap {
     padding: 16px 24px 40px;
@@ -1392,7 +1443,7 @@
     <div class="app-dialog-actions" style="justify-content: flex-start; gap: 8px; flex-wrap: wrap; align-items: center;">
       <button class="btn" type="button" id="manualImageBackend" title="Change SkyStats backend URL (for Tailscale or remote access)">Change backend URL…</button>
       <button class="btn" type="button" id="manualImageSelfUpdate" title="Pull the latest index.html from GitHub main and reload">Update from GitHub…</button>
-      <span class="app-version" title="App version (bump in index.html when releasing)">v1.9.1</span>
+      <span class="app-version" title="App version (bump in index.html when releasing)">v1.10.0</span>
     </div>
   </div>
 </div>
@@ -1500,6 +1551,8 @@ const PLANE_ALERT_DB_URL = 'https://raw.githubusercontent.com/sdr-enthusiasts/pl
 
 let data = { mil: [], gov: [], civ: [] };
 let statsData = null;        // cached SkyStats dashboard data, see fetchStats()
+let statsView = 'backend';   // 'backend' (feeder-wide feeds) | 'mine' (your logged aircraft)
+let statsUpdatedStr = '';    // last successful stats refresh, shown in the toolbar
 let typesMetric = 'flights'; // 'flights' (flights flown) | 'aircraft' (unique planes)
 let typesFrame = 'day';      // 'day' | 'month' | 'year' | 'all'
 let receiverData = { mil: [], gov: [], civ: [] };
@@ -1816,8 +1869,9 @@ async function fetchStats(manual) {
       throw reason instanceof Error ? reason : new Error('All stats requests failed');
     }
 
-    statsData = { ...stats, _failed: failed, _updated: formatTime(new Date()) };
-    if (activeSection === 'stats' && !modalHex) renderStats();
+    statsData = { ...stats, _failed: failed };
+    statsUpdatedStr = formatTime(new Date());
+    if (activeSection === 'stats' && statsView === 'backend' && !modalHex) renderStats();
   } catch (e) {
     if (e.name === 'AbortError') {
       if (controller !== currentController) return;
@@ -1870,6 +1924,58 @@ async function fetchTypes() {
   }
 }
 
+// Fetch the interesting-aircraft sections that power the "My aircraft" stats view.
+// Mirrors fetchAll's network logic but renders the dashboard instead of cards and
+// doesn't touch the aircraft-tab chips/counts.
+async function fetchMine(manual) {
+  if (currentController) currentController.abort();
+  const controller = new AbortController();
+  currentController = controller;
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+
+  const btn = document.getElementById('btnRefresh');
+  inFlight = true;
+  if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+
+  try {
+    const [mil, gov, civ] = await Promise.all([
+      fetchSection('mil', controller.signal, manual),
+      fetchSection('gov', controller.signal, manual),
+      fetchSection('civ', controller.signal, manual),
+    ]);
+    receiverData = { mil, gov, civ };
+    refreshMergedData();
+    statsUpdatedStr = formatTime(new Date());
+    if (activeSection === 'stats' && statsView === 'mine' && !modalHex) renderStats();
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      if (controller !== currentController) return;
+      if (document.visibilityState === 'hidden') return;
+      document.getElementById('content').innerHTML =
+        `<div class="status-msg error-msg">Request timed out reaching ${esc(API_BASE)}.<br><br><button class="btn" id="retryBtn">Retry</button> <button class="btn" id="backendBtnErr">Change backend URL</button></div>`;
+    } else {
+      document.getElementById('content').innerHTML =
+        `<div class="status-msg error-msg">Failed to load data from ${esc(API_BASE)}: ${esc(e.message)}<br><br><button class="btn" id="retryBtn">Retry</button> <button class="btn" id="backendBtnErr">Change backend URL</button></div>`;
+    }
+    const retryBtn = document.getElementById('retryBtn');
+    if (retryBtn) retryBtn.addEventListener('click', () => fetchMine(true));
+    const backendBtnErr = document.getElementById('backendBtnErr');
+    if (backendBtnErr) backendBtnErr.addEventListener('click', openBackendDialog);
+  } finally {
+    clearTimeout(timeoutId);
+    if (controller === currentController) {
+      currentController = null;
+      inFlight = false;
+      if (btn) { btn.disabled = false; btn.textContent = 'Refresh'; }
+    }
+  }
+}
+
+// Fetch whichever data the active Stats sub-view needs.
+function fetchStatsView(manual) {
+  return statsView === 'mine' ? fetchMine(manual) : fetchStats(manual);
+}
+
 // ISO-3166 alpha-2 → flag emoji via regional indicator symbols. '' if not valid.
 function isoToFlag(iso) {
   if (typeof iso !== 'string' || !/^[A-Za-z]{2}$/.test(iso)) return '';
@@ -1910,17 +2016,24 @@ function segControl(options, current, dataAttr) {
 
 function renderStats() {
   const content = document.getElementById('content');
+  const subtabs = `<div class="stats-subtabs">${segControl(
+    [{ key: 'backend', label: 'Backend stats' }, { key: 'mine', label: 'My aircraft' }],
+    statsView, 'data-stats-view')}</div>`;
+  const toolbar = `<div class="dashboard-toolbar">
+    <span class="dash-updated">Updated ${esc(statsUpdatedStr || '—')}</span>
+    <button class="btn btn-icon" type="button" data-stats-action="refresh" title="Refresh" aria-label="Refresh stats">⟳</button>
+  </div>`;
+
+  const body = statsView === 'mine' ? renderMyStatsBody() : renderBackendBody();
+  content.innerHTML = `<div class="dashboard">${subtabs}${toolbar}${body}</div>`;
+}
+
+function renderBackendBody() {
   if (!statsData) {
-    content.innerHTML = '<div class="status-msg"><div class="spinner"></div>Loading stats…</div>';
-    return;
+    return '<div class="status-msg"><div class="spinner"></div>Loading stats…</div>';
   }
   const s = statsData;
   const num = (v) => (typeof v === 'number' ? v : 0).toLocaleString();
-
-  const toolbar = `<div class="dashboard-toolbar">
-    <span class="dash-updated">Updated ${esc(s._updated || '—')}</span>
-    <button class="btn btn-icon" type="button" data-stats-action="refresh" title="Refresh" aria-label="Refresh stats">⟳</button>
-  </div>`;
 
   let bignums = '';
   if (s.totals) {
@@ -1957,7 +2070,124 @@ function renderStats() {
     note = `<div class="dashboard-note">Couldn't load ${esc(String(s._failed.length))} stats feed(s) — showing what's available.</div>`;
   }
 
-  content.innerHTML = `<div class="dashboard">${toolbar}${note}${bignums}<div class="panel-cols">${panels}</div></div>`;
+  return `${note}${bignums}<div class="panel-cols">${panels}</div>`;
+}
+
+// --- "My aircraft" stats, computed in the browser from the logged interesting list ---
+
+// All logged interesting aircraft across the three sections, deduped by hex.
+function allInterestingPlanes() {
+  const byHex = new Map();
+  ['mil', 'gov', 'civ'].forEach(g => (data[g] || []).forEach(p => { if (p && p.hex) byHex.set(p.hex, p); }));
+  return [...byHex.values()];
+}
+
+// Count planes by a key, returning a sorted [{ key, count }] list (descending).
+function topCounts(planes, keyFn, limit) {
+  const m = new Map();
+  planes.forEach(p => { const k = keyFn(p); if (k) m.set(k, (m.get(k) || 0) + 1); });
+  return [...m.entries()].map(([key, count]) => ({ key, count }))
+    .sort((a, b) => b.count - a.count).slice(0, limit || 999);
+}
+
+// A compact column chart (bars + labels) for time-of-day / day-of-week patterns.
+function colChart(buckets, sparse) {
+  const max = buckets.reduce((m, b) => Math.max(m, b.value || 0), 0) || 1;
+  const bars = buckets.map(b => {
+    const h = b.value ? Math.max(6, Math.round(b.value / max * 100)) : 0;
+    return `<div class="col" title="${esc(b.full)}: ${b.value || 0}"><div class="colbar" style="height:${h}%"></div></div>`;
+  }).join('');
+  const labels = buckets.map(b => `<span class="collabel">${esc(b.lbl || '')}</span>`).join('');
+  const cls = sparse ? 'colchart-bars sparse' : 'colchart-bars';
+  return `<div class="${cls}">${bars}</div><div class="colchart-labels${sparse ? ' sparse' : ''}">${labels}</div>`;
+}
+
+function renderMyStatsBody() {
+  const planes = allInterestingPlanes();
+  if (!planes.length) {
+    return '<div class="status-msg">No aircraft logged yet.</div>';
+  }
+
+  const now = Date.now() / 1000;
+  const epochs = planes.map(p => p.seen_epoch).filter(e => typeof e === 'number' && e > 0);
+  const new24h = epochs.filter(e => now - e < 86400).length;
+  const minE = epochs.length ? Math.min(...epochs) : 0;
+  const maxE = epochs.length ? Math.max(...epochs) : 0;
+
+  const bignums = `<div class="bignum-row">
+    <div class="stat-bignum"><div class="num">${esc(planes.length.toLocaleString())}</div><div class="label">Aircraft logged</div></div>
+    <div class="stat-bignum"><div class="num">${esc(new24h.toLocaleString())}</div><div class="label">New in last 24h</div></div>
+  </div>`;
+
+  // Hour-of-day (local), labelled every 6h.
+  const hourCounts = new Array(24).fill(0);
+  // Day-of-week, Monday first.
+  const dowCounts = new Array(7).fill(0);
+  epochs.forEach(e => {
+    const d = new Date(e * 1000);
+    hourCounts[d.getHours()]++;
+    dowCounts[(d.getDay() + 6) % 7]++;
+  });
+  const hourBuckets = hourCounts.map((v, h) => ({
+    value: v, full: String(h).padStart(2, '0') + ':00', lbl: h % 6 === 0 ? String(h).padStart(2, '0') : ''
+  }));
+  const dowNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const dowBuckets = dowCounts.map((v, i) => ({ value: v, full: dowNames[i], lbl: dowNames[i] }));
+
+  const groups = [
+    { key: 'Military', count: (data.mil || []).length },
+    { key: 'Government', count: (data.gov || []).length },
+    { key: 'Civilian', count: (data.civ || []).length },
+  ].filter(g => g.count > 0);
+
+  const tagMap = new Map();
+  planes.forEach(p => [p.tag1, p.tag2, p.tag3].forEach(t => { if (t) tagMap.set(t, (tagMap.get(t) || 0) + 1); }));
+  const tagList = [...tagMap.entries()].map(([key, count]) => ({ key, count }))
+    .sort((a, b) => b.count - a.count).slice(0, 12);
+
+  const operators = topCounts(planes, p => p.operator, 12);
+  const types = topCounts(planes, p => p.type || p.icao_type, 12);
+  const categories = topCounts(planes, p => p.category, 12);
+
+  // Activity facts. Busiest hour/day from the same last-seen distribution.
+  const last7 = epochs.filter(e => now - e < 7 * 86400).length;
+  let bh = 0, bd = 0;
+  for (let h = 1; h < 24; h++) if (hourCounts[h] > hourCounts[bh]) bh = h;
+  for (let i = 1; i < 7; i++) if (dowCounts[i] > dowCounts[bd]) bd = i;
+  const fact = (label, value) => `<dt>${esc(label)}</dt><dd>${esc(value)}</dd>`;
+  const activityPanel = minE
+    ? `<div class="stat-panel"><h3>Activity</h3><dl class="stat-facts">
+        ${fact('New in last 7 days', last7.toLocaleString())}
+        ${fact('Busiest hour', `${String(bh).padStart(2, '0')}:00 (${hourCounts[bh]})`)}
+        ${fact('Busiest day', `${dowNames[bd]} (${dowCounts[bd]})`)}
+        ${fact('Oldest last seen', formatDateTime(new Date(minE * 1000)))}
+        ${fact('Most recent', formatDateTime(new Date(maxE * 1000)))}
+      </dl></div>`
+    : '';
+
+  let panels = '';
+  panels += activityPanel;
+  panels += `<div class="stat-panel"><h3>By group</h3>${groups.map(g => barRowFromCount(g, groups[0].count)).join('')}</div>`;
+  panels += `<div class="stat-panel"><h3>Seen by hour of day</h3>${colChart(hourBuckets)}</div>`;
+  panels += `<div class="stat-panel"><h3>Seen by day of week</h3>${colChart(dowBuckets, true)}</div>`;
+  panels += barPanel('Top operators', operators, it => it.key, null, it => it.count);
+  panels += barPanel('Top types', types, it => it.key, null, it => it.count);
+  panels += barPanel('Top tags', tagList, it => it.key, null, it => it.count);
+  panels += barPanel('By category', categories, it => it.key, null, it => it.count);
+
+  return `${bignums}<div class="panel-cols">${panels}</div>`;
+}
+
+// Render one labelled bar row from a { key, count } entry against a max value.
+function barRowFromCount(entry, max) {
+  const pct = Math.max(2, Math.round((entry.count || 0) / (max || 1) * 100));
+  return `<div class="bar-row">
+    <div class="bar-head">
+      <span class="bar-label">${esc(entry.key)}</span>
+      <span class="bar-value">${esc((entry.count || 0).toLocaleString())}</span>
+    </div>
+    <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+  </div>`;
 }
 
 function updateStats() {
@@ -3308,7 +3538,17 @@ document.getElementById('sortSelect').addEventListener('change', (e) => {
 document.getElementById('content').addEventListener('click', (e) => {
   // Stats dashboard controls.
   const refreshEl = e.target.closest('[data-stats-action="refresh"]');
-  if (refreshEl) { if (!inFlight) { fetchStats(true); startPolling(); } return; }
+  if (refreshEl) { if (!inFlight) { fetchStatsView(true); startPolling(); } return; }
+  const viewEl = e.target.closest('[data-stats-view]');
+  if (viewEl) {
+    const v = viewEl.dataset.statsView;
+    if (v !== statsView) {
+      statsView = v;
+      renderStats();            // show cached data (or spinner) for the new view immediately
+      if (!inFlight) { fetchStatsView(true); startPolling(); }
+    }
+    return;
+  }
   const metricEl = e.target.closest('[data-types-metric]');
   if (metricEl) {
     const m = metricEl.dataset.typesMetric;
@@ -3354,7 +3594,7 @@ document.querySelectorAll('.section-tab').forEach(btn => {
     // Re-tapping the active Stats tab is a manual refresh (the dashboard has no
     // visible refresh control on mobile).
     if (!changed && target === 'stats') {
-      if (!inFlight) { fetchStats(true); startPolling(); }
+      if (!inFlight) { fetchStatsView(true); startPolling(); }
       return;
     }
     switchSection(target);
@@ -3362,7 +3602,7 @@ document.querySelectorAll('.section-tab').forEach(btn => {
     // clicking the Refresh button.
     if (changed && !inFlight) {
       setSourceMode();
-      if (target === 'stats') fetchStats(true);
+      if (target === 'stats') fetchStatsView(true);
       else fetchAll(true);
       startPolling();
     }
@@ -3378,7 +3618,7 @@ document.querySelectorAll('.view-toggle .btn').forEach(btn => {
 document.getElementById('btnRefresh').addEventListener('click', () => {
   if (inFlight) return;
   setSourceMode();
-  if (activeSection === 'stats') fetchStats(true);
+  if (activeSection === 'stats') fetchStatsView(true);
   else fetchAll(true);
   startPolling();
 });
@@ -3428,7 +3668,7 @@ function closeBackendDialog() {
 function applyBackendBase(newBase) {
   API_BASE = newBase;
   rebuildApi();
-  if (activeSection === 'stats') fetchStats(true);
+  if (activeSection === 'stats') fetchStatsView(true);
   else fetchAll(true);
 }
 
@@ -3693,7 +3933,7 @@ window.addEventListener('scroll', () => {
 function startPolling() {
   stopPolling();
   pollTimer = setInterval(() => {
-    if (activeSection === 'stats') fetchStats(false);
+    if (activeSection === 'stats') fetchStatsView(false);
     else fetchAll(false);
   }, REFRESH_INTERVAL);
 }
@@ -3705,7 +3945,7 @@ document.addEventListener('visibilitychange', () => {
     stopPolling();
     if (currentController) currentController.abort();
   } else {
-    if (activeSection === 'stats') fetchStats(false);
+    if (activeSection === 'stats') fetchStatsView(false);
     else fetchAll(false);
     startPolling();
   }

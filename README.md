@@ -24,10 +24,16 @@ It's also optimised for mobile since that was my main priority.
 - Mobile-friendly layout with a collapsing header.
 
 **Stats dashboard**
-- A Stats tab with feeder-wide statistics from the SkyStats `/api/stats` endpoints.
-- Totals for unique aircraft seen and flights tracked.
-- Top aircraft types, with toggles for metric (flights flown or unique aircraft) and timeframe (24h, month, year, all).
-- Top airlines, busiest routes, top domestic and international airports, and origin and destination countries.
+- A Stats tab with a switch between two views: "Backend stats" (feeder-wide) and "My aircraft" (your logged interesting aircraft).
+- Backend stats come from the SkyStats `/api/stats` endpoints:
+  - Totals for unique aircraft seen and flights tracked.
+  - Top aircraft types, with toggles for metric (flights flown or unique aircraft) and timeframe (24h, month, year, all).
+  - Top airlines, busiest routes, top domestic and international airports, and origin and destination countries.
+- My aircraft stats are computed in the browser from the logged mil/gov/civ lists:
+  - Activity summary: aircraft logged, new in the last 24h, busiest hour and day, and the last-seen date range.
+  - Breakdown by group (military, government, civilian).
+  - Seen by hour of day and by day of week (based on each aircraft's last-seen time).
+  - Top operators, types, tags, and categories.
 - Dependency-free CSS bar charts that pack neatly and stay readable on mobile.
 
 **Import and export**
