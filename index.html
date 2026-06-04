@@ -2897,7 +2897,18 @@ document.getElementById('content').addEventListener('click', (e) => {
 
 // Section tabs
 document.querySelectorAll('.section-tab').forEach(btn => {
-  btn.addEventListener('click', () => switchSection(btn.dataset.section));
+  btn.addEventListener('click', () => {
+    const target = btn.dataset.section;
+    const changed = target !== activeSection;
+    switchSection(target);
+    // Switching to a different tab auto-triggers a refresh, just like
+    // clicking the Refresh button.
+    if (changed && !inFlight) {
+      setSourceMode();
+      fetchAll(true);
+      startPolling();
+    }
+  });
 });
 
 // View toggle
