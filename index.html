@@ -1270,6 +1270,16 @@
     flex-wrap: wrap;
     gap: 6px;
   }
+  .manual-image-jetphotos-row .btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-left: 8px;
+    padding-right: 8px;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .manual-image-jetphotos-row .btn[disabled] {
     opacity: 0.5;
     cursor: not-allowed;
@@ -1418,7 +1428,7 @@
     <label for="manualImageHex">ICAO hex</label>
     <input type="text" id="manualImageHex" maxlength="8" autocomplete="off" placeholder="A1B2C3">
     <div class="manual-image-jetphotos-row">
-      <button class="btn" type="button" id="manualImageJetphotos" disabled title="Open JetPhotos search for this aircraft's registration">Search JetPhotos for <span id="manualImageJetphotosReg">registration</span></button>
+      <button class="btn" type="button" id="manualImageJetphotos" disabled title="Open JetPhotos search for this aircraft's registration">JetPhotos reg <span id="manualImageJetphotosReg"></span></button>
       <button class="btn" type="button" id="manualImageGoogle" disabled title="Google the ICAO hex">Google hex <span id="manualImageGoogleHex"></span></button>
       <button class="btn" type="button" id="manualImagePlanespotters" disabled title="Open Planespotters hex lookup">Planespotters hex <span id="manualImagePlanespottersHex"></span></button>
     </div>
@@ -1444,7 +1454,7 @@
     <div class="app-dialog-actions" style="justify-content: flex-start; gap: 8px; flex-wrap: wrap; align-items: center;">
       <button class="btn" type="button" id="manualImageBackend" title="Change SkyStats backend URL (for Tailscale or remote access)">Change backend URL…</button>
       <button class="btn" type="button" id="manualImageSelfUpdate" title="Pull the latest index.html from GitHub main and reload">Update from GitHub…</button>
-      <span class="app-version" title="App version (bump in index.html when releasing)">v1.10.1</span>
+      <span class="app-version" title="App version (bump in index.html when releasing)">v1.10.2</span>
     </div>
   </div>
 </div>
@@ -2587,7 +2597,7 @@ function fillManualImageFields(hex) {
     jpBtn.dataset.reg = reg;
   } else {
     jpBtn.disabled = true;
-    jpReg.textContent = 'registration';
+    jpReg.textContent = '';
     delete jpBtn.dataset.reg;
   }
 

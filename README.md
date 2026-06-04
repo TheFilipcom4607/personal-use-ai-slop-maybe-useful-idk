@@ -48,7 +48,7 @@ It's also optimised for mobile since that was my main priority.
 
 **Hidden menu (triple-click the title)**
 - Add manual per-aircraft image links, saved either locally or on the Pi for everyone.
-- One-click JetPhotos lookup by registration and Google search by ICAO hex.
+- One-click JetPhotos lookup by registration, plus Google and Planespotters lookups by ICAO hex.
 - Optional Tailscale-friendly backend URL override for accessing the GUI from outside the local network.
 - Optional "Update from GitHub" button that pulls the latest `index.html` from `main` and reloads, so you don't need to ssh in to deploy a change (requires the Flask sidecar, see [server/README.md](server/README.md)).
 
