@@ -21,6 +21,7 @@
     --mil: #6b8ac4;
     --gov: #9d8fc4;
     --civ: #6fb89c;
+    --stats: #d39a6a;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -137,6 +138,12 @@
     color: var(--civ);
   }
 
+  .section-tab.active-stats {
+    background: rgba(211, 154, 106, 0.12);
+    border-color: var(--stats);
+    color: var(--stats);
+  }
+
   .tab-count {
     font-size: 0.72rem;
     background: rgba(255,255,255,0.1);
@@ -151,6 +158,13 @@
     align-items: center;
     flex-wrap: wrap;
   }
+
+  /* On the Stats tab the aircraft-list controls and counts don't apply. The
+     dashboard carries its own toolbar (updated time + refresh). */
+  .header.stats-active .controls,
+  .header.stats-active .chip-row,
+  .header.stats-active #countPill,
+  .header.stats-active #updatedPill { display: none; }
 
   .search-box {
     flex: 1;
@@ -241,6 +255,179 @@
     grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
     gap: 16px;
     padding: 20px 24px 40px;
+  }
+
+  /* Stats dashboard */
+  .dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px 24px 40px;
+  }
+  /* Let children shrink instead of forcing horizontal overflow. */
+  .dashboard > * { min-width: 0; }
+
+  .dashboard-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .dash-updated { font-size: 0.8rem; color: var(--text-dim); }
+
+  .btn-icon {
+    padding: 6px 11px;
+    line-height: 1;
+    font-size: 0.95rem;
+  }
+
+  .dashboard-note {
+    font-size: 0.8rem;
+    color: var(--amber);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+  }
+
+  .bignum-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+    gap: 16px;
+  }
+  .bignum-row > * { min-width: 0; }
+
+  /* Masonry-style packing so panels of different heights don't leave gaps. */
+  .panel-cols {
+    column-width: 320px;
+    column-gap: 16px;
+  }
+  .panel-cols .stat-panel {
+    display: inline-block;
+    width: 100%;
+    margin: 0 0 16px;
+    break-inside: avoid;
+  }
+
+  .stat-bignum {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 22px;
+  }
+
+  .stat-bignum .num {
+    font-size: 2.4rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--stats);
+    line-height: 1.1;
+  }
+
+  .stat-bignum .label {
+    margin-top: 4px;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+  }
+
+  .stat-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px 18px;
+  }
+
+  .stat-panel h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 14px;
+    color: var(--text);
+  }
+
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .panel-head h3 { margin-bottom: 0; }
+
+  .seg-group { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .seg {
+    display: inline-flex;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .seg button {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 4px 9px;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+  }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button:hover { color: var(--text); }
+  .seg button.active { background: rgba(211, 154, 106, 0.18); color: var(--stats); }
+
+  .bar-row {
+    margin-bottom: 11px;
+  }
+  .bar-row:last-child { margin-bottom: 0; }
+
+  .bar-empty { font-size: 0.82rem; color: var(--text-dim); }
+
+  .bar-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 0.82rem;
+    margin-bottom: 4px;
+  }
+
+  .bar-label {
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .bar-label .bar-sub {
+    color: var(--text-dim);
+    font-size: 0.74rem;
+    margin-left: 6px;
+  }
+
+  .bar-value {
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .bar-track {
+    height: 7px;
+    background: var(--surface2);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    background: var(--stats);
+    border-radius: 999px;
+    min-width: 2px;
   }
 
   /* Table */
@@ -648,6 +835,12 @@
     /* Grid: single column, tighter */
     .grid { padding: 10px; gap: 10px; grid-template-columns: 1fr; }
     .card-img-wrap { height: 200px; }
+
+    /* Dashboard: single column, tighter */
+    .dashboard { padding: 10px; gap: 10px; }
+    .panel-cols { column-count: 1; column-width: auto; column-gap: 10px; }
+    .panel-cols .stat-panel { margin-bottom: 10px; }
+    .stat-bignum .num { font-size: 1.9rem; }
 
     /* Kill hover effects on touch, no ghost taps */
     .card { transition: none; }
@@ -1071,6 +1264,9 @@
     <button class="section-tab" id="tabCiv" data-section="civ">
       Civilian <span class="tab-count" id="civCount">0</span>
     </button>
+    <button class="section-tab" id="tabStats" data-section="stats">
+      Stats
+    </button>
   </div>
   <div class="header-collapsible" id="headerCollapsible">
     <div class="controls">
@@ -1193,7 +1389,7 @@
     <div class="app-dialog-actions" style="justify-content: flex-start; gap: 8px; flex-wrap: wrap; align-items: center;">
       <button class="btn" type="button" id="manualImageBackend" title="Change SkyStats backend URL (for Tailscale or remote access)">Change backend URL…</button>
       <button class="btn" type="button" id="manualImageSelfUpdate" title="Pull the latest index.html from GitHub main and reload">Update from GitHub…</button>
-      <span class="app-version" title="App version (bump in index.html when releasing)">v1.8.6</span>
+      <span class="app-version" title="App version (bump in index.html when releasing)">v1.9.0</span>
     </div>
   </div>
 </div>
@@ -1260,6 +1456,35 @@ function rebuildApi() {
   API.civ = `${API_BASE}/api/stats/interesting/civilian`;
 }
 rebuildApi();
+// Feeder-wide SkyStats endpoints powering the Stats dashboard. Built against
+// API_BASE at fetch time (see fetchStats). The aircraft-types feed varies by the
+// selected metric (flights flown / unique aircraft) and timeframe — see typesMetric
+// / typesFrame and statsEndpoints().
+const TYPES_TIMEFRAMES = [
+  { key: 'day',   label: '24h'   },
+  { key: 'month', label: 'Month' },
+  { key: 'year',  label: 'Year'  },
+  { key: 'all',   label: 'All'   },
+];
+const TYPES_METRICS = [
+  { key: 'flights',  label: 'Flights'  },
+  { key: 'aircraft', label: 'Aircraft' },
+];
+function typesEndpoint() {
+  return `/api/stats/types/${typesMetric}/${typesFrame}`;
+}
+function statsEndpoints() {
+  return {
+    totals:      '/api/stats/seen/totals',
+    types:       typesEndpoint(),
+    airlines:    '/api/stats/routes/airlines',
+    airportsDom: '/api/stats/routes/airports-domestic',
+    airportsInt: '/api/stats/routes/airports-international',
+    routes:      '/api/stats/routes/routes',
+    ctryOrigin:  '/api/stats/routes/countries-origin',
+    ctryDest:    '/api/stats/routes/countries-destination',
+  };
+}
 const REFRESH_INTERVAL = 60000;
 const FETCH_TIMEOUT = 10000;
 const IMPORT_STORAGE_KEY = 'adsbdisplay.importedSnapshot.v1';
@@ -1271,6 +1496,9 @@ const PLANE_IMAGES_URL = 'https://raw.githubusercontent.com/sdr-enthusiasts/plan
 const PLANE_ALERT_DB_URL = 'https://raw.githubusercontent.com/sdr-enthusiasts/plane-alert-db/refs/heads/main/plane-alert-db.csv';
 
 let data = { mil: [], gov: [], civ: [] };
+let statsData = null;        // cached SkyStats dashboard data, see fetchStats()
+let typesMetric = 'flights'; // 'flights' (flights flown) | 'aircraft' (unique planes)
+let typesFrame = 'day';      // 'day' | 'month' | 'year' | 'all'
 let receiverData = { mil: [], gov: [], civ: [] };
 let importedBackups = { mil: [], gov: [], civ: [] };
 let manualImages = {};       // local-only, persisted in localStorage
@@ -1547,6 +1775,188 @@ function preservingScroll(fn) {
   });
 }
 
+// --- Stats dashboard ---
+
+async function fetchStats(manual) {
+  // Abort any in-flight request before starting a new one (mirrors fetchAll).
+  if (currentController) currentController.abort();
+  const controller = new AbortController();
+  currentController = controller;
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+
+  const btn = document.getElementById('btnRefresh');
+  inFlight = true;
+  if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+
+  const eps = statsEndpoints();
+  const keys = Object.keys(eps);
+  try {
+    // Tolerate partial failure: one bad endpoint shouldn't blank the dashboard.
+    const results = await Promise.allSettled(keys.map(k => {
+      const url = `${API_BASE}${eps[k]}${manual ? `?_=${Date.now()}` : ''}`;
+      return fetch(url, { signal: controller.signal }).then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      });
+    }));
+
+    const stats = {};
+    const failed = [];
+    results.forEach((res, i) => {
+      if (res.status === 'fulfilled') stats[keys[i]] = res.value;
+      else failed.push(keys[i]);
+    });
+
+    // Every endpoint failing means the backend is unreachable — treat as hard error.
+    if (failed.length === keys.length) {
+      const reason = results[0] && results[0].reason;
+      throw reason instanceof Error ? reason : new Error('All stats requests failed');
+    }
+
+    statsData = { ...stats, _failed: failed, _updated: formatTime(new Date()) };
+    if (activeSection === 'stats' && !modalHex) renderStats();
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      if (controller !== currentController) return;
+      if (document.visibilityState === 'hidden') return;
+      document.getElementById('content').innerHTML =
+        `<div class="status-msg error-msg">Request timed out reaching ${esc(API_BASE)}.<br><br><button class="btn" id="retryBtn">Retry</button> <button class="btn" id="backendBtnErr">Change backend URL</button></div>`;
+    } else {
+      document.getElementById('content').innerHTML =
+        `<div class="status-msg error-msg">Failed to load stats from ${esc(API_BASE)}: ${esc(e.message)}<br><br><button class="btn" id="retryBtn">Retry</button> <button class="btn" id="backendBtnErr">Change backend URL</button></div>`;
+    }
+    const retryBtn = document.getElementById('retryBtn');
+    if (retryBtn) retryBtn.addEventListener('click', () => fetchStats(true));
+    const backendBtnErr = document.getElementById('backendBtnErr');
+    if (backendBtnErr) backendBtnErr.addEventListener('click', openBackendDialog);
+  } finally {
+    clearTimeout(timeoutId);
+    if (controller === currentController) {
+      currentController = null;
+      inFlight = false;
+      if (btn) { btn.disabled = false; btn.textContent = 'Refresh'; }
+    }
+  }
+}
+
+// Refetch only the aircraft-types feed after a metric/timeframe toggle. Uses its
+// own controller so it doesn't disturb the main poll/abort bookkeeping.
+let typesController = null;
+async function fetchTypes() {
+  if (typesController) typesController.abort();
+  const controller = new AbortController();
+  typesController = controller;
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+  try {
+    const url = `${API_BASE}${typesEndpoint()}?_=${Date.now()}`;
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const arr = await res.json();
+    if (!statsData) statsData = { _failed: [] };
+    statsData.types = arr;
+    if (statsData._failed) statsData._failed = statsData._failed.filter(k => k !== 'types');
+    if (activeSection === 'stats' && !modalHex) renderStats();
+  } catch (e) {
+    if (e.name !== 'AbortError' && activeSection === 'stats' && !modalHex) {
+      // Reflect the failed selection without nuking the rest of the dashboard.
+      if (statsData) { statsData.types = []; renderStats(); }
+    }
+  } finally {
+    clearTimeout(timeoutId);
+    if (controller === typesController) typesController = null;
+  }
+}
+
+// ISO-3166 alpha-2 → flag emoji via regional indicator symbols. '' if not valid.
+function isoToFlag(iso) {
+  if (typeof iso !== 'string' || !/^[A-Za-z]{2}$/.test(iso)) return '';
+  const cp = iso.toUpperCase().split('').map(c => 0x1F1E6 + c.charCodeAt(0) - 65);
+  return String.fromCodePoint(...cp);
+}
+
+function barPanel(title, items, labelFn, subFn, valueFn, controlsHTML) {
+  const head = controlsHTML
+    ? `<div class="panel-head"><h3>${esc(title)}</h3>${controlsHTML}</div>`
+    : `<h3>${esc(title)}</h3>`;
+  if (!Array.isArray(items) || !items.length) {
+    return `<div class="stat-panel">${head}<div class="bar-empty">No data.</div></div>`;
+  }
+  const max = items.reduce((m, it) => Math.max(m, valueFn(it) || 0), 0) || 1;
+  const rows = items.map(it => {
+    const val = valueFn(it) || 0;
+    const pct = Math.max(2, Math.round(val / max * 100));
+    const sub = subFn ? subFn(it) : '';
+    return `
+      <div class="bar-row">
+        <div class="bar-head">
+          <span class="bar-label">${esc(labelFn(it))}${sub ? `<span class="bar-sub">${esc(sub)}</span>` : ''}</span>
+          <span class="bar-value">${esc(val.toLocaleString())}</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+      </div>`;
+  }).join('');
+  return `<div class="stat-panel">${head}${rows}</div>`;
+}
+
+// A small segmented toggle. `dataAttr` is the data-* name read by the click handler.
+function segControl(options, current, dataAttr) {
+  return `<div class="seg" role="group">` + options.map(o =>
+    `<button type="button" ${dataAttr}="${o.key}" class="${o.key === current ? 'active' : ''}">${esc(o.label)}</button>`
+  ).join('') + `</div>`;
+}
+
+function renderStats() {
+  const content = document.getElementById('content');
+  if (!statsData) {
+    content.innerHTML = '<div class="status-msg"><div class="spinner"></div>Loading stats…</div>';
+    return;
+  }
+  const s = statsData;
+  const num = (v) => (typeof v === 'number' ? v : 0).toLocaleString();
+
+  const toolbar = `<div class="dashboard-toolbar">
+    <span class="dash-updated">Updated ${esc(s._updated || '—')}</span>
+    <button class="btn btn-icon" type="button" data-stats-action="refresh" title="Refresh" aria-label="Refresh stats">⟳</button>
+  </div>`;
+
+  let bignums = '';
+  if (s.totals) {
+    bignums = `<div class="bignum-row">
+      <div class="stat-bignum"><div class="num">${esc(num(s.totals.total_aircraft))}</div><div class="label">Aircraft seen</div></div>
+      <div class="stat-bignum"><div class="num">${esc(num(s.totals.total_flights))}</div><div class="label">Flights tracked</div></div>
+    </div>`;
+  }
+
+  // Aircraft types panel carries metric (flights vs unique aircraft) + timeframe toggles.
+  const typesControls = `<div class="seg-group">
+    ${segControl(TYPES_METRICS, typesMetric, 'data-types-metric')}
+    ${segControl(TYPES_TIMEFRAMES, typesFrame, 'data-types-frame')}
+  </div>`;
+
+  let panels = '';
+  panels += barPanel(`Top aircraft types`, s.types,
+    it => it.aircraft_type, it => (it.percentage != null ? `${it.percentage}%` : ''), it => it.count, typesControls);
+  panels += barPanel('Top airlines', s.airlines,
+    it => it.airline_name, it => (it.airline_iata || it.airline_icao || ''), it => it.flight_count);
+  panels += barPanel('Busiest routes', s.routes,
+    it => it.route || `${it.origin_iata_code} → ${it.destination_iata_code}`, null, it => it.flight_count);
+  panels += barPanel('Top domestic airports', s.airportsDom,
+    it => it.airport_name, it => (it.airport_code || ''), it => it.flight_count);
+  panels += barPanel('Top international airports', s.airportsInt,
+    it => it.airport_name, it => `${it.airport_code || ''}${it.airport_country ? ' · ' + it.airport_country : ''}`, it => it.flight_count);
+  panels += barPanel('Countries — origin', s.ctryOrigin,
+    it => `${isoToFlag(it.country_iso)} ${it.country_name}`.trim(), null, it => it.flight_count);
+  panels += barPanel('Countries — destination', s.ctryDest,
+    it => `${isoToFlag(it.country_iso)} ${it.country_name}`.trim(), null, it => it.flight_count);
+
+  let note = '';
+  if (s._failed && s._failed.length) {
+    note = `<div class="dashboard-note">Couldn't load ${esc(String(s._failed.length))} stats feed(s) — showing what's available.</div>`;
+  }
+
+  content.innerHTML = `<div class="dashboard">${toolbar}${note}${bignums}<div class="panel-cols">${panels}</div></div>`;
+}
+
 function updateStats() {
   const planes = allPlanes();
   document.getElementById('countPill').textContent = `${planes.length} aircraft`;
@@ -1557,9 +1967,19 @@ function switchSection(section) {
   activeSection = section;
   activeCategories.clear();
 
+  const isStats = section === 'stats';
   document.getElementById('tabMil').className = 'section-tab' + (section === 'mil' ? ' active-mil' : '');
   document.getElementById('tabGov').className = 'section-tab' + (section === 'gov' ? ' active-gov' : '');
   document.getElementById('tabCiv').className = 'section-tab' + (section === 'civ' ? ' active-civ' : '');
+  document.getElementById('tabStats').className = 'section-tab' + (isStats ? ' active-stats' : '');
+
+  // The aircraft-list controls don't apply to the dashboard.
+  document.querySelector('.header').classList.toggle('stats-active', isStats);
+
+  if (isStats) {
+    renderStats();
+    return;
+  }
 
   // Changing section shows the list from scratch, don't flash every card as "new".
   newHexes[section] = new Set();
@@ -2879,6 +3299,30 @@ document.getElementById('sortSelect').addEventListener('change', (e) => {
 
 // --- Delegated click handlers ---
 document.getElementById('content').addEventListener('click', (e) => {
+  // Stats dashboard controls.
+  const refreshEl = e.target.closest('[data-stats-action="refresh"]');
+  if (refreshEl) { if (!inFlight) { fetchStats(true); startPolling(); } return; }
+  const metricEl = e.target.closest('[data-types-metric]');
+  if (metricEl) {
+    const m = metricEl.dataset.typesMetric;
+    if (m !== typesMetric) {
+      typesMetric = m;
+      metricEl.parentNode.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === metricEl));
+      fetchTypes();
+    }
+    return;
+  }
+  const frameEl = e.target.closest('[data-types-frame]');
+  if (frameEl) {
+    const f = frameEl.dataset.typesFrame;
+    if (f !== typesFrame) {
+      typesFrame = f;
+      frameEl.parentNode.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === frameEl));
+      fetchTypes();
+    }
+    return;
+  }
+
   const th = e.target.closest('th[data-sort]');
   if (th) { setSort(th.dataset.sort); return; }
 
@@ -2905,7 +3349,8 @@ document.querySelectorAll('.section-tab').forEach(btn => {
     // clicking the Refresh button.
     if (changed && !inFlight) {
       setSourceMode();
-      fetchAll(true);
+      if (target === 'stats') fetchStats(true);
+      else fetchAll(true);
       startPolling();
     }
   });
@@ -2920,7 +3365,8 @@ document.querySelectorAll('.view-toggle .btn').forEach(btn => {
 document.getElementById('btnRefresh').addEventListener('click', () => {
   if (inFlight) return;
   setSourceMode();
-  fetchAll(true);
+  if (activeSection === 'stats') fetchStats(true);
+  else fetchAll(true);
   startPolling();
 });
 
@@ -2969,7 +3415,8 @@ function closeBackendDialog() {
 function applyBackendBase(newBase) {
   API_BASE = newBase;
   rebuildApi();
-  fetchAll(true);
+  if (activeSection === 'stats') fetchStats(true);
+  else fetchAll(true);
 }
 
 document.getElementById('backendDialogCancel').addEventListener('click', closeBackendDialog);
@@ -3232,7 +3679,10 @@ window.addEventListener('scroll', () => {
 
 function startPolling() {
   stopPolling();
-  pollTimer = setInterval(() => fetchAll(false), REFRESH_INTERVAL);
+  pollTimer = setInterval(() => {
+    if (activeSection === 'stats') fetchStats(false);
+    else fetchAll(false);
+  }, REFRESH_INTERVAL);
 }
 function stopPolling() {
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
@@ -3242,7 +3692,8 @@ document.addEventListener('visibilitychange', () => {
     stopPolling();
     if (currentController) currentController.abort();
   } else {
-    fetchAll(false);
+    if (activeSection === 'stats') fetchStats(false);
+    else fetchAll(false);
     startPolling();
   }
 });
