@@ -23,6 +23,13 @@ It's also optimised for mobile since that was my main priority.
 - 24-hour time formatting.
 - Mobile-friendly layout with a collapsing header.
 
+**Stats dashboard**
+- A Stats tab with feeder-wide statistics from the SkyStats `/api/stats` endpoints.
+- Totals for unique aircraft seen and flights tracked.
+- Top aircraft types, with toggles for metric (flights flown or unique aircraft) and timeframe (24h, month, year, all).
+- Top airlines, busiest routes, top domestic and international airports, and origin and destination countries.
+- Dependency-free CSS bar charts that pack neatly and stay readable on mobile.
+
 **Import and export**
 - CSV export for the current filtered list, with an "include tags" toggle.
 - CSV and JSON import for restoring backups.
