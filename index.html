@@ -838,6 +838,9 @@
 
     /* Dashboard: single column, tighter */
     .dashboard { padding: 10px; gap: 10px; }
+    /* The toolbar (updated time + refresh) wastes a whole row on a phone; drop
+       it and let re-tapping the Stats tab be the manual refresh. */
+    .dashboard-toolbar { display: none; }
     .panel-cols { column-count: 1; column-width: auto; column-gap: 10px; }
     .panel-cols .stat-panel { margin-bottom: 10px; }
     .stat-bignum .num { font-size: 1.9rem; }
@@ -1975,6 +1978,10 @@ function switchSection(section) {
 
   // The aircraft-list controls don't apply to the dashboard.
   document.querySelector('.header').classList.toggle('stats-active', isStats);
+  // The mobile header reserves a JS-measured height for the collapsible controls;
+  // re-measure so hiding them on the Stats tab doesn't leave an empty bar (and
+  // restoring them on an aircraft tab reclaims the right height).
+  if (typeof measureCollapsible === 'function') requestAnimationFrame(measureCollapsible);
 
   if (isStats) {
     renderStats();
@@ -3344,6 +3351,12 @@ document.querySelectorAll('.section-tab').forEach(btn => {
   btn.addEventListener('click', () => {
     const target = btn.dataset.section;
     const changed = target !== activeSection;
+    // Re-tapping the active Stats tab is a manual refresh (the dashboard has no
+    // visible refresh control on mobile).
+    if (!changed && target === 'stats') {
+      if (!inFlight) { fetchStats(true); startPolling(); }
+      return;
+    }
     switchSection(target);
     // Switching to a different tab auto-triggers a refresh, just like
     // clicking the Refresh button.
