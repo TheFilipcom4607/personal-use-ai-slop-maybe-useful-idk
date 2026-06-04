@@ -4,3 +4,7 @@
 # Python
 __pycache__/
 *.pyc
+
+# Local Claude tooling / notes
+.claude/
+VERY IMPORTANT READ CLAUDE.txt
