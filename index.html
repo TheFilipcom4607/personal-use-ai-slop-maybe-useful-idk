@@ -859,7 +859,9 @@
         height 0.28s cubic-bezier(0.22, 0.61, 0.36, 1),
         opacity 0.2s ease,
         transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
-      will-change: height, opacity, transform;
+      /* height is layout-bound and can't be composited; promoting for it
+         just adds a layer that iOS Safari occasionally flashes. */
+      will-change: opacity, transform;
     }
 
     .header.collapsed .header-collapsible {
@@ -1454,7 +1456,7 @@
     <div class="app-dialog-actions" style="justify-content: flex-start; gap: 8px; flex-wrap: wrap; align-items: center;">
       <button class="btn" type="button" id="manualImageBackend" title="Change SkyStats backend URL (for Tailscale or remote access)">Change backend URL…</button>
       <button class="btn" type="button" id="manualImageSelfUpdate" title="Pull the latest index.html from GitHub main and reload">Update from GitHub…</button>
-      <span class="app-version" title="App version (bump in index.html when releasing)">v1.10.2</span>
+      <span class="app-version" title="App version (bump in index.html when releasing)">v1.10.3</span>
     </div>
   </div>
 </div>
@@ -3897,6 +3899,17 @@ let lastScrollY = window.scrollY;
 let accumDelta = 0;
 let ticking = false;
 let isMobile = window.matchMedia('(max-width: 640px)').matches;
+// The header is position:sticky and in document flow, so animating its
+// height shifts the page and feeds back into scrollY. While the collapse
+// transition runs, those self-inflicted deltas must be ignored or a slow
+// scroll near the threshold flip-flops the header (visible flicker on iOS).
+let settleUntil = 0;
+
+function setCollapsed(on) {
+  if (header.classList.contains('collapsed') === on) return;
+  header.classList.toggle('collapsed', on);
+  settleUntil = performance.now() + 400; // transition is 0.28s + margin
+}
 
 function measureCollapsible() {
   if (!collapsible) return;
@@ -3932,7 +3945,19 @@ window.addEventListener('scroll', () => {
   }
   ticking = true;
   requestAnimationFrame(() => {
-    const sy = window.scrollY;
+    // Clamp out iOS rubber-band overscroll (negative at top, past max at
+    // bottom) so the bounce doesn't register as scroll movement.
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    const sy = Math.min(Math.max(window.scrollY, 0), Math.max(0, max));
+
+    if (performance.now() < settleUntil) {
+      // Height transition in progress; these deltas are our own doing.
+      lastScrollY = sy;
+      accumDelta = 0;
+      ticking = false;
+      return;
+    }
+
     const delta = sy - lastScrollY;
 
     // Accumulate same-direction movement; reset on direction change.
@@ -3943,14 +3968,10 @@ window.addEventListener('scroll', () => {
 
     // Hysteresis: need ~12px of sustained movement before toggling.
     if (accumDelta > 12 && sy > 60) {
-      if (!header.classList.contains('collapsed')) {
-        header.classList.add('collapsed');
-      }
+      setCollapsed(true);
       accumDelta = 0;
-    } else if (accumDelta < -12) {
-      if (header.classList.contains('collapsed')) {
-        header.classList.remove('collapsed');
-      }
+    } else if (accumDelta < -12 || sy <= 8) {
+      setCollapsed(false);
       accumDelta = 0;
     }
 
