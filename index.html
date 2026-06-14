@@ -6,22 +6,22 @@
 <title>Fun Plane Viewer</title>
 <style>
   :root {
-    --bg: #0e1014;
+    --bg: #0d0f14;
     --surface: #181a22;
     --surface2: #20232d;
-    --border: #282b38;
-    --text: #d4d7df;
-    --text-dim: #7a7f92;
-    --accent: #6b8ac4;
-    --accent-dim: #38507a;
-    --green: #6fb88a;
-    --amber: #c9a961;
-    --red: #c97a7a;
+    --border: #2a2e3d;
+    --text: #dcdfe7;
+    --text-dim: #80859a;
+    --accent: #5c90e1;
+    --accent-dim: #314e84;
+    --green: #51c591;
+    --amber: #e2b442;
+    --red: #e07575;
     --tag-bg: #252835;
-    --mil: #6b8ac4;
-    --gov: #9d8fc4;
-    --civ: #6fb89c;
-    --stats: #d39a6a;
+    --mil: #5c90e1;
+    --gov: #a685e1;
+    --civ: #4ec6a1;
+    --stats: #e99b56;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -59,8 +59,10 @@
     white-space: nowrap;
   }
 
+  /* Logo: each word tinted in its category color */
   .header h1 .mil-color { color: var(--mil); }
   .header h1 .gov-color { color: var(--gov); }
+  .header h1 .civ-color { color: var(--civ); }
 
   .header-stats {
     display: flex;
@@ -121,25 +123,25 @@
   .section-tab:hover { color: var(--text); }
 
   .section-tab.active-mil {
-    background: rgba(107, 138, 196, 0.12);
+    background: rgba(92, 144, 225, 0.14);
     border-color: var(--mil);
     color: var(--mil);
   }
 
   .section-tab.active-gov {
-    background: rgba(157, 143, 196, 0.12);
+    background: rgba(166, 133, 225, 0.14);
     border-color: var(--gov);
     color: var(--gov);
   }
 
   .section-tab.active-civ {
-    background: rgba(111, 184, 156, 0.12);
+    background: rgba(78, 198, 161, 0.14);
     border-color: var(--civ);
     color: var(--civ);
   }
 
   .section-tab.active-stats {
-    background: rgba(211, 154, 106, 0.12);
+    background: rgba(233, 155, 86, 0.14);
     border-color: var(--stats);
     color: var(--stats);
   }
@@ -378,7 +380,7 @@
   }
   .seg button + button { border-left: 1px solid var(--border); }
   .seg button:hover { color: var(--text); }
-  .seg button.active { background: rgba(211, 154, 106, 0.18); color: var(--stats); }
+  .seg button.active { background: rgba(233, 155, 86, 0.18); color: var(--stats); }
 
   .bar-row {
     margin-bottom: 11px;
@@ -515,7 +517,7 @@
     vertical-align: middle;
   }
 
-  .table-wrap tr:hover td { background: rgba(107, 138, 196, 0.04); }
+  .table-wrap tr:hover td { background: rgba(92, 144, 225, 0.05); }
 
   .table-thumb {
     width: 60px;
@@ -603,21 +605,21 @@
 
   /* New aircraft highlight */
   @keyframes new-glow {
-    0%   { box-shadow: 0 0 0 0 rgba(111, 184, 138, 0.55); border-color: var(--green); }
-    70%  { box-shadow: 0 0 0 6px rgba(111, 184, 138, 0);   border-color: var(--green); }
-    100% { box-shadow: 0 0 0 0 rgba(111, 184, 138, 0);     border-color: var(--border); }
+    0%   { box-shadow: 0 0 0 0 rgba(81, 197, 145, 0.55); border-color: var(--green); }
+    70%  { box-shadow: 0 0 0 6px rgba(81, 197, 145, 0);   border-color: var(--green); }
+    100% { box-shadow: 0 0 0 0 rgba(81, 197, 145, 0);     border-color: var(--border); }
   }
   .card--new {
     animation: new-glow 3s ease-out 1;
     border-color: var(--green);
   }
   tr.row--new td {
-    background: rgba(111, 184, 138, 0.08);
+    background: rgba(81, 197, 145, 0.09);
     animation: row-fade 3s ease-out 1;
   }
   @keyframes row-fade {
-    0%   { background: rgba(111, 184, 138, 0.22); }
-    100% { background: rgba(111, 184, 138, 0); }
+    0%   { background: rgba(81, 197, 145, 0.24); }
+    100% { background: rgba(81, 197, 145, 0); }
   }
 
   /* Table group badge */
@@ -715,9 +717,9 @@
     letter-spacing: 0.05em;
   }
 
-  .badge-mil { background: rgba(107, 138, 196, 0.85); color: #fff; }
-  .badge-gov { background: rgba(157, 143, 196, 0.85); color: #fff; }
-  .badge-civ { background: rgba(111, 184, 156, 0.85); color: #fff; }
+  .badge-mil { background: rgba(92, 144, 225, 0.88); color: #fff; }
+  .badge-gov { background: rgba(166, 133, 225, 0.88); color: #fff; }
+  .badge-civ { background: rgba(78, 198, 161, 0.88); color: #fff; }
 
   .card-body {
     padding: 14px 16px;
@@ -1313,7 +1315,7 @@
 
 <div class="header">
   <div class="header-top">
-    <h1 id="appTitle"><span class="mil-color">Fun</span> <span class="gov-color">Plane</span> <span style="color:var(--civ)">Viewer</span></h1>
+    <h1 id="appTitle"><span class="mil-color">Fun</span> <span class="gov-color">Plane</span> <span class="civ-color">Viewer</span></h1>
     <div class="header-stats">
       <span class="stat-pill" id="sourcePill"><span class="live-dot"></span> Live</span>
       <span class="stat-pill" id="countPill">0 aircraft</span>
@@ -1456,7 +1458,7 @@
     <div class="app-dialog-actions" style="justify-content: flex-start; gap: 8px; flex-wrap: wrap; align-items: center;">
       <button class="btn" type="button" id="manualImageBackend" title="Change SkyStats backend URL (for Tailscale or remote access)">Change backend URL…</button>
       <button class="btn" type="button" id="manualImageSelfUpdate" title="Pull the latest index.html from GitHub main and reload">Update from GitHub…</button>
-      <span class="app-version" title="App version (bump in index.html when releasing)">v1.10.3</span>
+      <span class="app-version" title="App version (bump in index.html when releasing)">v1.10.4</span>
     </div>
   </div>
 </div>
