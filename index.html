@@ -1458,7 +1458,7 @@
     <div class="app-dialog-actions" style="justify-content: flex-start; gap: 8px; flex-wrap: wrap; align-items: center;">
       <button class="btn" type="button" id="manualImageBackend" title="Change SkyStats backend URL (for Tailscale or remote access)">Change backend URL…</button>
       <button class="btn" type="button" id="manualImageSelfUpdate" title="Pull the latest index.html from GitHub main and reload">Update from GitHub…</button>
-      <span class="app-version" title="App version (bump in index.html when releasing)">v1.10.4</span>
+      <span class="app-version" title="App version (bump in index.html when releasing)">v1.10.5</span>
     </div>
   </div>
 </div>
@@ -3447,8 +3447,30 @@ function cycleImg(hex, dir) {
   const imgs = getImages(p);
   if (imgs.length <= 1) return;
   const cur = imageIndices[hex] || 0;
-  imageIndices[hex] = (cur + dir + imgs.length) % imgs.length;
-  render();
+  const idx = (cur + dir + imgs.length) % imgs.length;
+  imageIndices[hex] = idx;
+
+  // Update only the affected card in place. A full render() rebuilds every
+  // card's <img>, which makes iOS Safari re-decode all images and flash them.
+  const card = document.querySelector(`.card[data-hex="${cssEscape(hex)}"]`);
+  if (!card) { render(); return; }
+  const img = card.querySelector('.card-real-img');
+  if (img) {
+    const nextSrc = encodeURI(imgs[idx] || '');
+    if (img.getAttribute('src') !== nextSrc) img.setAttribute('src', nextSrc);
+  } else {
+    render();
+    return;
+  }
+  card.querySelectorAll('.card-img-dots span').forEach((dot, i) => {
+    dot.classList.toggle('active', i === idx);
+  });
+}
+
+// Minimal CSS attribute-selector escaping for hex ids (CSS.escape fallback).
+function cssEscape(value) {
+  if (window.CSS && typeof CSS.escape === 'function') return CSS.escape(value);
+  return String(value).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
 }
 
 function setView(v) {
