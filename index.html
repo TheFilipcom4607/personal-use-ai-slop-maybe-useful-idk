@@ -59,6 +59,15 @@
     white-space: nowrap;
   }
 
+  /* Triple-tap targets for the hidden menu: no tap-delay/double-tap zoom,
+     no text selection or iOS long-press callout fighting the gesture. */
+  #appTitle, #modalImgSlot {
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
   /* Logo: each word tinted in its category color */
   .header h1 .mil-color { color: var(--mil); }
   .header h1 .gov-color { color: var(--gov); }
@@ -1458,7 +1467,7 @@
     <div class="app-dialog-actions" style="justify-content: flex-start; gap: 8px; flex-wrap: wrap; align-items: center;">
       <button class="btn" type="button" id="manualImageBackend" title="Change SkyStats backend URL (for Tailscale or remote access)">Change backend URL…</button>
       <button class="btn" type="button" id="manualImageSelfUpdate" title="Pull the latest index.html from GitHub main and reload">Update from GitHub…</button>
-      <span class="app-version" title="App version (bump in index.html when releasing)">v1.10.5</span>
+      <span class="app-version" title="App version (bump in index.html when releasing)">v1.10.6</span>
     </div>
   </div>
 </div>
@@ -3740,10 +3749,20 @@ document.getElementById('backendDialogInput').addEventListener('keydown', (e) =>
   if (e.key === 'Enter') { e.preventDefault(); document.getElementById('backendDialogSave').click(); }
 });
 
-// Manual image links menu (hidden, open via triple-click on title)
-document.getElementById('appTitle').addEventListener('click', (e) => {
-  if (e.detail >= 3) openManualImageMenu();
-});
+// Triple-tap/click detection that works on touch too (MouseEvent.detail
+// is unreliable on iOS Safari, so count clicks within a rolling window).
+function onTripleClick(el, handler) {
+  let count = 0, timer = null;
+  el.addEventListener('click', (e) => {
+    count++;
+    clearTimeout(timer);
+    if (count >= 3) { count = 0; handler(e); return; }
+    timer = setTimeout(() => { count = 0; }, 600);
+  });
+}
+
+// Manual image links menu (hidden, open via triple-click/tap on title)
+onTripleClick(document.getElementById('appTitle'), () => openManualImageMenu());
 (() => {
   const search = document.getElementById('manualImagePlaneSearch');
   const box = document.getElementById('manualImageSuggestions');
@@ -3907,10 +3926,10 @@ document.getElementById('modalThumbs').addEventListener('click', (e) => {
   const img = e.target.closest('img[data-url]');
   if (img) selectModalImg(img, img.dataset.url);
 });
-// Hidden gesture: triple-click the main modal photo to edit photos for this plane.
+// Hidden gesture: triple-click/tap the main modal photo to edit photos for this plane.
 // Mirrors the triple-click-title gesture for the global menu.
-document.getElementById('modalImgSlot').addEventListener('click', (e) => {
-  if (e.detail >= 3 && modalHex) openManualImageMenu(modalHex);
+onTripleClick(document.getElementById('modalImgSlot'), () => {
+  if (modalHex) openManualImageMenu(modalHex);
 });
 
 // Auto-collapse header on mobile when scrolling down, expand on scroll up.
