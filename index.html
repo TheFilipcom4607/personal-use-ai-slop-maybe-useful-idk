@@ -1258,6 +1258,22 @@
     font-size: 0.8rem;
   }
 
+  /* Collapse the status line when blank so the dialog stays compact on
+     small screens (e.g. the mobile web view). */
+  .manual-image-status:empty { display: none; }
+
+  /* Compact spacing on small screens so the whole manual-image menu fits
+     without internal scrolling. The intro paragraph is dropped: it's the
+     hidden power-user menu, the description is dead weight on a phone. */
+  @media (max-width: 640px) {
+    .app-dialog-overlay { padding: 10px; }
+    .app-dialog { padding: 14px; }
+    .manual-image-dialog > p { display: none; }
+    .manual-image-dialog label { margin-top: 8px; }
+    .app-dialog-actions { margin-top: 12px; }
+    .manual-image-divider { margin-top: 12px; }
+  }
+
   .manual-image-actions {
     justify-content: space-between;
   }
@@ -1471,7 +1487,7 @@
     <div class="app-dialog-actions" style="justify-content: flex-start; gap: 8px; flex-wrap: wrap; align-items: center;">
       <button class="btn" type="button" id="manualImageBackend" title="Change SkyStats backend URL (for Tailscale or remote access)">Change backend URL…</button>
       <button class="btn" type="button" id="manualImageSelfUpdate" title="Pull the latest index.html from GitHub main and reload">Update from GitHub…</button>
-      <span class="app-version" title="App version (bump in index.html when releasing)">v1.10.7</span>
+      <span class="app-version" title="App version (bump in index.html when releasing)">v1.10.8</span>
     </div>
   </div>
 </div>
