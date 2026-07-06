@@ -1141,6 +1141,10 @@
 
   .app-dialog {
     width: min(420px, 100%);
+    max-height: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 12px;
@@ -1252,6 +1256,22 @@
     margin-top: 10px;
     color: var(--text-dim);
     font-size: 0.8rem;
+  }
+
+  /* Collapse the status line when blank so the dialog stays compact on
+     small screens (e.g. the mobile web view). */
+  .manual-image-status:empty { display: none; }
+
+  /* Compact spacing on small screens so the whole manual-image menu fits
+     without internal scrolling. The intro paragraph is dropped: it's the
+     hidden power-user menu, the description is dead weight on a phone. */
+  @media (max-width: 640px) {
+    .app-dialog-overlay { padding: 10px; }
+    .app-dialog { padding: 14px; }
+    .manual-image-dialog > p { display: none; }
+    .manual-image-dialog label { margin-top: 8px; }
+    .app-dialog-actions { margin-top: 12px; }
+    .manual-image-divider { margin-top: 12px; }
   }
 
   .manual-image-actions {
@@ -1467,7 +1487,7 @@
     <div class="app-dialog-actions" style="justify-content: flex-start; gap: 8px; flex-wrap: wrap; align-items: center;">
       <button class="btn" type="button" id="manualImageBackend" title="Change SkyStats backend URL (for Tailscale or remote access)">Change backend URL…</button>
       <button class="btn" type="button" id="manualImageSelfUpdate" title="Pull the latest index.html from GitHub main and reload">Update from GitHub…</button>
-      <span class="app-version" title="App version (bump in index.html when releasing)">v1.10.6</span>
+      <span class="app-version" title="App version (bump in index.html when releasing)">v1.10.8</span>
     </div>
   </div>
 </div>
@@ -2799,7 +2819,10 @@ function openManualImageMenu(hex) {
   const overlay = document.getElementById('manualImageMenu');
   overlay.classList.add('open');
   overlay.setAttribute('aria-hidden', 'false');
-  document.getElementById('manualImageHex').focus();
+  // Don't auto-focus on touch devices — it pops the on-screen keyboard.
+  if (window.matchMedia('(pointer: fine)').matches) {
+    document.getElementById('manualImageHex').focus();
+  }
 }
 
 function closeManualImageMenu() {
