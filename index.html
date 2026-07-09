@@ -1134,10 +1134,10 @@
 
   .app-dialog-overlay.open { display: flex; }
 
-  /* Choose-dialog is always shown on top of any other open dialog (e.g. the
-     manual-image menu, which stays open in the background while the user
-     picks Local vs Server). */
-  #appChooseDialog { z-index: 10010; }
+  /* Confirm/alert and choose dialogs are always shown on top of any other
+     open dialog (e.g. the manual-image menu, which stays open in the
+     background while the user confirms a removal or picks Local vs Server). */
+  #appDialog, #appChooseDialog { z-index: 10010; }
 
   .app-dialog {
     width: min(420px, 100%);
@@ -1487,7 +1487,7 @@
     <div class="app-dialog-actions" style="justify-content: flex-start; gap: 8px; flex-wrap: wrap; align-items: center;">
       <button class="btn" type="button" id="manualImageBackend" title="Change SkyStats backend URL (for Tailscale or remote access)">Change backend URL…</button>
       <button class="btn" type="button" id="manualImageSelfUpdate" title="Pull the latest index.html from GitHub main and reload">Update from GitHub…</button>
-      <span class="app-version" title="App version (bump in index.html when releasing)">v1.10.8</span>
+      <span class="app-version" title="App version (bump in index.html when releasing)">v1.10.9</span>
     </div>
   </div>
 </div>
@@ -3868,9 +3868,7 @@ document.getElementById('manualImageBackend').addEventListener('click', () => {
   openBackendDialog();
 });
 document.getElementById('manualImageSelfUpdate').addEventListener('click', async () => {
-  // Close the secret menu first: appDialog and manualImageMenu share a
-  // z-index, and the menu is later in the DOM, so the confirm dialog
-  // would otherwise paint behind it.
+  // Close the secret menu first; on success the page reloads anyway.
   closeManualImageMenu();
   const ok = await appConfirm(
     'Update from GitHub',
