@@ -1491,7 +1491,7 @@
     <div class="app-dialog-actions" style="justify-content: flex-start; gap: 8px; flex-wrap: wrap; align-items: center;">
       <button class="btn" type="button" id="manualImageBackend" title="Change SkyStats backend URL (for Tailscale or remote access)">Change backend URL…</button>
       <button class="btn" type="button" id="manualImageSelfUpdate" title="Pull the latest index.html from GitHub main and reload">Update from GitHub…</button>
-      <span class="app-version" title="App version (bump in index.html when releasing)">v1.11.0</span>
+      <span class="app-version" title="App version (bump in index.html when releasing)">v1.11.1</span>
     </div>
   </div>
 </div>
@@ -3950,16 +3950,15 @@ function printStamp() {
 }
 
 function buildPrintJob(p, hex, imageModule, imageHost) {
-  const callsign = (p && String(p.flight || '').trim()) || hex;
+  const desc = p ? String(p.type || '').trim() : '';
   const modules = [
-    { type: 'heading', text: 'AIRCRAFT SPOTTED', size: 2, bold: true,
+    { type: 'heading', text: 'AIRCRAFT RECORD', size: 2, bold: true,
       rule: true, char: '=', after: 1 },
-    { type: 'text', text: callsign, width: 2, height: 2, bold: true,
+    { type: 'text', text: desc || hex, width: 2, height: 2, bold: true,
       justify: 'center', encoding: 'cp437', after: 0 },
   ];
-  const desc = p ? String(p.type || '').trim() : '';
   if (desc) {
-    modules.push({ type: 'text', text: desc, justify: 'center',
+    modules.push({ type: 'text', text: hex, justify: 'center',
                    encoding: 'cp437', after: 0 });
   }
   const operator = p ? String(p.operator || '').trim() : '';
