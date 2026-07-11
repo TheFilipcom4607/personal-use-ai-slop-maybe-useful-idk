@@ -1137,7 +1137,7 @@
   /* Confirm/alert and choose dialogs are always shown on top of any other
      open dialog (e.g. the manual-image menu, which stays open in the
      background while the user confirms a removal or picks Local vs Server). */
-  #appDialog, #appChooseDialog { z-index: 10010; }
+  #appDialog, #appChooseDialog, #printerDialog { z-index: 10010; }
 
   .app-dialog {
     width: min(420px, 100%);
@@ -1278,7 +1278,8 @@
     justify-content: space-between;
   }
 
-  .manual-image-actions .right-actions {
+  .manual-image-actions .right-actions,
+  .manual-image-actions .left-actions {
     display: flex;
     gap: 8px;
   }
@@ -1476,7 +1477,10 @@
 
     <div class="manual-image-status" id="manualImageStatus"></div>
     <div class="app-dialog-actions manual-image-actions">
-      <button class="btn" type="button" id="manualImageRemove">Remove</button>
+      <div class="left-actions">
+        <button class="btn" type="button" id="manualImageRemove">Remove</button>
+        <button class="btn" type="button" id="manualImagePrint" disabled title="Print a receipt for this aircraft on the thermal printer">Print</button>
+      </div>
       <div class="right-actions">
         <button class="btn" type="button" id="manualImageClose">Close</button>
         <button class="btn btn-active" type="button" id="manualImageSave">Save</button>
@@ -1487,7 +1491,7 @@
     <div class="app-dialog-actions" style="justify-content: flex-start; gap: 8px; flex-wrap: wrap; align-items: center;">
       <button class="btn" type="button" id="manualImageBackend" title="Change SkyStats backend URL (for Tailscale or remote access)">Change backend URL…</button>
       <button class="btn" type="button" id="manualImageSelfUpdate" title="Pull the latest index.html from GitHub main and reload">Update from GitHub…</button>
-      <span class="app-version" title="App version (bump in index.html when releasing)">v1.10.9</span>
+      <span class="app-version" title="App version (bump in index.html when releasing)">v1.11.0</span>
     </div>
   </div>
 </div>
@@ -1502,6 +1506,19 @@
       <button class="btn" type="button" id="backendDialogCancel">Cancel</button>
       <button class="btn" type="button" id="backendDialogReset">Reset to default</button>
       <button class="btn btn-active" type="button" id="backendDialogSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="app-dialog-overlay" id="printerDialog" aria-hidden="true">
+  <div class="app-dialog" role="dialog" aria-modal="true" aria-labelledby="printerDialogTitle">
+    <h2 id="printerDialogTitle">Print receipt</h2>
+    <p>Address of the thermal printer bridge. Prints a receipt for <strong id="printerDialogPlane"></strong> with its first photo.</p>
+    <input type="text" id="printerDialogInput" class="backend-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="url" placeholder="192.168.0.212:8080">
+    <div class="backend-hint" id="printerDialogHint"></div>
+    <div class="app-dialog-actions">
+      <button class="btn" type="button" id="printerDialogCancel">Cancel</button>
+      <button class="btn btn-active" type="button" id="printerDialogPrint">Print</button>
     </div>
   </div>
 </div>
@@ -2658,6 +2675,15 @@ function fillManualImageFields(hex) {
     delete psBtn.dataset.hex;
   }
 
+  const prBtn = document.getElementById('manualImagePrint');
+  if (normalizedHex) {
+    prBtn.disabled = false;
+    prBtn.dataset.hex = normalizedHex;
+  } else {
+    prBtn.disabled = true;
+    delete prBtn.dataset.hex;
+  }
+
   let suffix = '';
   if (source === 'local') suffix = ' - using local override';
   else if (source === 'server') suffix = ' - using server entry';
@@ -3582,6 +3608,10 @@ function closeModal(e) {
 }
 
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('printerDialog').classList.contains('open')) {
+    closePrinterDialog();
+    return;
+  }
   if (e.key === 'Escape' && document.getElementById('manualImageMenu').classList.contains('open')) {
     closeManualImageMenu();
     return;
@@ -3770,6 +3800,341 @@ document.getElementById('backendDialog').addEventListener('click', (e) => {
 });
 document.getElementById('backendDialogInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); document.getElementById('backendDialogSave').click(); }
+});
+
+// Thermal printer receipts (secret menu -> Print). Talks to the CircuitPython
+// printer bridge: POST /print with a {reset, modules:[...]} job (see the
+// thermal JSON format doc). Mirrors the desktop tar1090 receipt script, minus
+// the live position / signal / feeder sections this viewer has no data for.
+const PRINTER_STORAGE_KEY = 'adsbdisplay.printerUrl.v1';
+const PRINTER_DEFAULT_URL = 'http://192.168.0.212:8080';
+const PRINT_PHOTO_WIDTH = 384;      // 58mm printer head width in dots
+const PRINT_PHOTO_MAX_HEIGHT = 640; // keeps the job well under the board's ~90KB body limit
+const PRINT_MAX_BODY_BYTES = 90000;
+
+function loadStoredPrinterUrl() {
+  try { return normalizeApiBase(localStorage.getItem(PRINTER_STORAGE_KEY) || ''); }
+  catch (_) { return ''; }
+}
+
+function storePrinterUrl(value) {
+  try {
+    if (value) localStorage.setItem(PRINTER_STORAGE_KEY, value);
+    else localStorage.removeItem(PRINTER_STORAGE_KEY);
+  } catch (_) {}
+}
+
+// Everything CP437 can print beyond ASCII, plus hand mappings for letters NFKD
+// can't decompose, so names like Timisoara don't come out as "Timi?oara".
+const CP437_EXTRA = 'ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■';
+const CP437_TRANSLIT = {
+  'ł': 'l', 'Ł': 'L', 'ø': 'o', 'Ø': 'O', 'đ': 'd', 'Đ': 'D',
+  'ð': 'd', 'Ð': 'D', 'þ': 'th', 'Þ': 'Th', 'œ': 'oe', 'Œ': 'OE',
+  'ħ': 'h', 'Ħ': 'H', 'ı': 'i', 'İ': 'I', 'ẞ': 'SS'
+};
+
+function cp437Printable(text) {
+  let out = '';
+  for (const ch of String(text)) {
+    const code = ch.codePointAt(0);
+    if (ch === '\n' || (code >= 0x20 && code < 0x7f) || CP437_EXTRA.includes(ch)) {
+      out += ch;
+      continue;
+    }
+    if (CP437_TRANSLIT[ch]) { out += CP437_TRANSLIT[ch]; continue; }
+    const flat = ch.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+    out += /^[\x20-\x7e]+$/.test(flat) ? flat : '?';
+  }
+  return out;
+}
+
+// Load an image with pixel access. Most photo hosts (e.g. the jetphotos CDN)
+// don't send CORS headers, so a direct cross-origin load fails; fall back to
+// the wsrv.nl image proxy, which serves any public image with CORS enabled
+// and resizes it server-side to keep the transfer small.
+function loadPrintImage(url) {
+  const load = src => new Promise((resolve, reject) => {
+    const el = new Image();
+    el.crossOrigin = 'anonymous';
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error('image failed to load'));
+    el.src = src;
+  });
+  return load(url).catch(() =>
+    load('https://wsrv.nl/?url=' + encodeURIComponent(url) + '&w=' + (PRINT_PHOTO_WIDTH * 2)));
+}
+
+// First image link -> printer 'image' module (resize to 384 wide, grayscale
+// with autocontrast + gamma lift, Atkinson dither, pack 1-bit, base64).
+// Throws if the image can't be loaded even via the proxy, or the host blocks
+// pixel reads (tainted canvas) - the caller just prints without the photo.
+async function printerImageModule(url) {
+  const img = await loadPrintImage(url);
+
+  const width = PRINT_PHOTO_WIDTH;
+  let height = Math.max(1, Math.round(img.naturalHeight * width / img.naturalWidth));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, width, height);
+
+  const cropTop = height > PRINT_PHOTO_MAX_HEIGHT ? (height - PRINT_PHOTO_MAX_HEIGHT) >> 1 : 0;
+  if (height > PRINT_PHOTO_MAX_HEIGHT) height = PRINT_PHOTO_MAX_HEIGHT;
+  let rgba;
+  try {
+    rgba = ctx.getImageData(0, cropTop, width, height).data;
+  } catch (_) {
+    throw new Error('host blocks cross-origin pixel reads');
+  }
+
+  // Grayscale, stretch to full range, then gamma < 1 to lift midtones:
+  // thermal paper prints darker than a screen, and less black is less heat.
+  const px = new Float32Array(width * height);
+  let lo = 255, hi = 0;
+  for (let i = 0; i < px.length; i++) {
+    const g = 0.299 * rgba[i * 4] + 0.587 * rgba[i * 4 + 1] + 0.114 * rgba[i * 4 + 2];
+    px[i] = g;
+    if (g < lo) lo = g;
+    if (g > hi) hi = g;
+  }
+  const span = hi > lo ? hi - lo : 1;
+  for (let i = 0; i < px.length; i++) {
+    px[i] = 255 * Math.pow(Math.max(0, px[i] - lo) / span, 0.6);
+  }
+
+  // Atkinson dithering: diffuse 6/8 of the error, drop the rest - blows out
+  // highlights a little, which suits low-contrast thermal heads.
+  const rowBytes = (width + 7) >> 3;
+  const packed = new Uint8Array(rowBytes * height);
+  for (let y = 0; y < height; y++) {
+    const base = y * width;
+    for (let x = 0; x < width; x++) {
+      const i = base + x;
+      const old = px[i];
+      let err;
+      if (old < 128) {
+        packed[y * rowBytes + (x >> 3)] |= 0x80 >> (x & 7);
+        err = old / 8;
+      } else {
+        err = (old - 255) / 8;
+      }
+      if (err) {
+        if (x + 1 < width) px[i + 1] += err;
+        if (x + 2 < width) px[i + 2] += err;
+        if (y + 1 < height) {
+          const below = i + width;
+          if (x) px[below - 1] += err;
+          px[below] += err;
+          if (x + 1 < width) px[below + 1] += err;
+        }
+        if (y + 2 < height) px[i + 2 * width] += err;
+      }
+    }
+  }
+
+  let bin = '';
+  for (let i = 0; i < packed.length; i += 8192) {
+    bin += String.fromCharCode.apply(null, packed.subarray(i, i + 8192));
+  }
+  return { type: 'image', width, height, data: btoa(bin), after: 0 };
+}
+
+function printStamp() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+         `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+function buildPrintJob(p, hex, imageModule, imageHost) {
+  const callsign = (p && String(p.flight || '').trim()) || hex;
+  const modules = [
+    { type: 'heading', text: 'AIRCRAFT SPOTTED', size: 2, bold: true,
+      rule: true, char: '=', after: 1 },
+    { type: 'text', text: callsign, width: 2, height: 2, bold: true,
+      justify: 'center', encoding: 'cp437', after: 0 },
+  ];
+  const desc = p ? String(p.type || '').trim() : '';
+  if (desc) {
+    modules.push({ type: 'text', text: desc, justify: 'center',
+                   encoding: 'cp437', after: 0 });
+  }
+  const operator = p ? String(p.operator || '').trim() : '';
+  if (operator) {
+    modules.push({ type: 'text', text: operator, justify: 'center',
+                   encoding: 'cp437', after: 0 });
+  }
+  if (imageModule) {
+    modules.push(imageModule);
+    if (imageHost) {
+      modules.push({ type: 'text', text: 'photo: ' + imageHost, justify: 'center',
+                     font: 'b', encoding: 'cp437', after: 0 });
+    }
+  }
+
+  const kv = ['ICAO: ' + hex];
+  if (p) {
+    if (p.registration) kv.push('Reg: ' + String(p.registration).trim());
+    if (p.icao_type) kv.push('Type: ' + String(p.icao_type).trim());
+    if (p.flight) kv.push('Callsign: ' + String(p.flight).trim());
+    if (p.category) kv.push('Category: ' + String(p.category).trim());
+    if (p.group) kv.push('Group: ' + String(p.group).trim().toUpperCase());
+  }
+  modules.push({ type: 'section', title: 'AIRCRAFT', char: '-', after: 1 });
+  modules.push({ type: 'keyvalue', text: kv.join('\n'), sep: ':', leader: '.',
+                 encoding: 'cp437', after: 1 });
+
+  const tags = p ? [p.tag1, p.tag2, p.tag3].filter(Boolean) : [];
+  if (tags.length) {
+    modules.push({ type: 'text', text: tags.join(' * '), justify: 'center',
+                   font: 'b', encoding: 'cp437', after: 1 });
+  }
+
+  if (p && (p.seen_epoch || p.seen)) {
+    const seen = [];
+    if (p.seen_epoch) seen.push('Seen: ' + timeAgo(p.seen_epoch));
+    if (p.seen) seen.push('Last seen: ' + formatDateTime(new Date(p.seen)));
+    modules.push({ type: 'section', title: 'SIGHTING', char: '-', after: 1 });
+    modules.push({ type: 'keyvalue', text: seen.join('\n'), sep: ':', leader: '.',
+                   encoding: 'cp437', after: 1 });
+  }
+
+  modules.push({ type: 'rule', char: '-', width: 32, after: 1 });
+  modules.push({ type: 'qr', data: `https://globe.airplanes.live/?icao=${hex.toLowerCase()}`,
+                 size: 6, ecc: 'M', justify: 'center', after: 1 });
+  modules.push({ type: 'feed', lines: 1 });
+  modules.push({ type: 'text', text: 'HEX:', justify: 'center' });
+  modules.push({ type: 'barcode', data: hex, kind: 'code39', bar_width: 2,
+                 bar_height: 70, hri: 'below', justify: 'center', after: 1 });
+  modules.push({ type: 'feed', lines: 1 });
+  modules.push({ type: 'text', text: 'Fun Plane Viewer - ' + printStamp(),
+                 justify: 'center', font: 'b', encoding: 'cp437', after: 1 });
+  modules.push({ type: 'feed', lines: 3 });
+
+  for (const m of modules) {
+    for (const key of ['text', 'title', 'label']) {
+      if (typeof m[key] === 'string') m[key] = cp437Printable(m[key]);
+    }
+  }
+  return { reset: true, modules };
+}
+
+async function sendPrintJob(printerUrl, job) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 90000);
+  try {
+    const res = await fetch(printerUrl.replace(/\/+$/, '') + '/print', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(job),
+      signal: controller.signal,
+    });
+    const raw = await res.text();
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    // The board streams NDJSON progress events; the last "done" event carries
+    // the module count and any per-module errors.
+    let done = null;
+    for (const line of raw.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        const ev = JSON.parse(trimmed);
+        if (ev && ev.type === 'done') done = ev;
+      } catch (_) {}
+    }
+    return done;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function printPlaneReceipt(hex, printerUrl) {
+  const status = document.getElementById('manualImageStatus');
+  const updatedPill = document.getElementById('updatedPill');
+  const p = findPlane(hex);
+  const firstImage = p ? getImages(p)[0] : getManualImageLinks(hex)[0];
+
+  let imageModule = null;
+  let imageHost = '';
+  let photoNote = '';
+  if (firstImage) {
+    status.textContent = `Preparing photo for ${hex}...`;
+    try {
+      imageModule = await printerImageModule(firstImage);
+      try { imageHost = new URL(firstImage, location.href).hostname; } catch (_) {}
+    } catch (err) {
+      photoNote = ` - photo skipped (${err.message})`;
+    }
+  }
+
+  let job = buildPrintJob(p, hex, imageModule, imageHost);
+  if (imageModule && JSON.stringify(job).length > PRINT_MAX_BODY_BYTES) {
+    job = buildPrintJob(p, hex, null, '');
+    photoNote = ' - photo skipped (job too large for the board)';
+  }
+
+  status.textContent = `Printing ${hex} on ${printerUrl}...`;
+  try {
+    const done = await sendPrintJob(printerUrl, job);
+    const errCount = done && Array.isArray(done.errors) ? done.errors.length : 0;
+    status.textContent = errCount
+      ? `Printed ${hex} with ${errCount} module error(s)${photoNote}`
+      : `Printed ${hex}${done ? ` (${done.modules} modules)` : ''}${photoNote}`;
+    updatedPill.textContent = `Printed receipt for ${hex}`;
+  } catch (err) {
+    status.textContent = `Print failed for ${hex}`;
+    await appAlert('Print Failed', `Could not print on ${printerUrl}: ${err.message}`);
+  }
+}
+
+// Printer address dialog - shown on top of the secret menu, like confirms.
+let printerDialogHex = '';
+
+function openPrinterDialog(hex) {
+  printerDialogHex = normalizeHex(hex);
+  const overlay = document.getElementById('printerDialog');
+  const input = document.getElementById('printerDialogInput');
+  const p = findPlane(printerDialogHex);
+  document.getElementById('printerDialogPlane').textContent =
+    p ? describePlane(p) : printerDialogHex;
+  input.value = loadStoredPrinterUrl() || PRINTER_DEFAULT_URL;
+  document.getElementById('printerDialogHint').textContent =
+    'IP:port of the printer bridge (POST /print). Remembered for next time.';
+  overlay.classList.add('open');
+  overlay.setAttribute('aria-hidden', 'false');
+  // Don't auto-focus on touch devices - it pops the on-screen keyboard.
+  if (window.matchMedia('(pointer: fine)').matches) {
+    setTimeout(() => input.focus(), 0);
+  }
+}
+
+function closePrinterDialog() {
+  const overlay = document.getElementById('printerDialog');
+  overlay.classList.remove('open');
+  overlay.setAttribute('aria-hidden', 'true');
+}
+
+document.getElementById('manualImagePrint').addEventListener('click', (e) => {
+  const hex = e.currentTarget.dataset.hex;
+  if (!hex) return;
+  openPrinterDialog(hex);
+});
+document.getElementById('printerDialogCancel').addEventListener('click', closePrinterDialog);
+document.getElementById('printerDialogPrint').addEventListener('click', () => {
+  const url = normalizeApiBase(document.getElementById('printerDialogInput').value)
+    || PRINTER_DEFAULT_URL;
+  storePrinterUrl(url);
+  closePrinterDialog();
+  printPlaneReceipt(printerDialogHex, url);
+});
+document.getElementById('printerDialog').addEventListener('click', (e) => {
+  if (e.target.id === 'printerDialog') closePrinterDialog();
+});
+document.getElementById('printerDialogInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('printerDialogPrint').click(); }
 });
 
 // Triple-tap/click detection that works on touch too (MouseEvent.detail
