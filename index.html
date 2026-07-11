@@ -1491,7 +1491,7 @@
     <div class="app-dialog-actions" style="justify-content: flex-start; gap: 8px; flex-wrap: wrap; align-items: center;">
       <button class="btn" type="button" id="manualImageBackend" title="Change SkyStats backend URL (for Tailscale or remote access)">Change backend URL…</button>
       <button class="btn" type="button" id="manualImageSelfUpdate" title="Pull the latest index.html from GitHub main and reload">Update from GitHub…</button>
-      <span class="app-version" title="App version (bump in index.html when releasing)">v1.11.1</span>
+      <span class="app-version" title="App version (bump in index.html when releasing)">v1.11.2</span>
     </div>
   </div>
 </div>
@@ -3949,13 +3949,40 @@ function printStamp() {
          `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
+// Greedy word wrap: the printer hard-wraps at the column limit and happily
+// splits words ("RC-135W A / irseeker"), so break lines on spaces ourselves
+// and send explicit newlines. Words longer than the width are hard-broken.
+// Font A fits 32 chars per line (16 at double width), font B fits 42.
+function wrapPrintText(text, width) {
+  const lines = [];
+  for (const para of String(text).split('\n')) {
+    const words = para.split(/\s+/).filter(Boolean);
+    if (!words.length) { lines.push(''); continue; }
+    let line = '';
+    for (let word of words) {
+      if (line && line.length + 1 + word.length <= width) {
+        line += ' ' + word;
+        continue;
+      }
+      if (line) lines.push(line);
+      while (word.length > width) {
+        lines.push(word.slice(0, width));
+        word = word.slice(width);
+      }
+      line = word;
+    }
+    if (line) lines.push(line);
+  }
+  return lines.join('\n');
+}
+
 function buildPrintJob(p, hex, imageModule, imageHost) {
   const desc = p ? String(p.type || '').trim() : '';
   const modules = [
     { type: 'heading', text: 'AIRCRAFT RECORD', size: 2, bold: true,
       rule: true, char: '=', after: 1 },
-    { type: 'text', text: desc || hex, width: 2, height: 2, bold: true,
-      justify: 'center', encoding: 'cp437', after: 0 },
+    { type: 'text', text: wrapPrintText(desc || hex, 16), width: 2, height: 2,
+      bold: true, justify: 'center', encoding: 'cp437', after: 0 },
   ];
   if (desc) {
     modules.push({ type: 'text', text: hex, justify: 'center',
@@ -3963,14 +3990,14 @@ function buildPrintJob(p, hex, imageModule, imageHost) {
   }
   const operator = p ? String(p.operator || '').trim() : '';
   if (operator) {
-    modules.push({ type: 'text', text: operator, justify: 'center',
+    modules.push({ type: 'text', text: wrapPrintText(operator, 32), justify: 'center',
                    encoding: 'cp437', after: 0 });
   }
   if (imageModule) {
     modules.push(imageModule);
     if (imageHost) {
-      modules.push({ type: 'text', text: 'photo: ' + imageHost, justify: 'center',
-                     font: 'b', encoding: 'cp437', after: 0 });
+      modules.push({ type: 'text', text: wrapPrintText('photo: ' + imageHost, 42),
+                     justify: 'center', font: 'b', encoding: 'cp437', after: 0 });
     }
   }
 
@@ -3988,8 +4015,8 @@ function buildPrintJob(p, hex, imageModule, imageHost) {
 
   const tags = p ? [p.tag1, p.tag2, p.tag3].filter(Boolean) : [];
   if (tags.length) {
-    modules.push({ type: 'text', text: tags.join(' * '), justify: 'center',
-                   font: 'b', encoding: 'cp437', after: 1 });
+    modules.push({ type: 'text', text: wrapPrintText(tags.join(' * '), 42),
+                   justify: 'center', font: 'b', encoding: 'cp437', after: 1 });
   }
 
   if (p && (p.seen_epoch || p.seen)) {
