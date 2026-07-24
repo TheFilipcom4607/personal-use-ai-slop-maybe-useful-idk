@@ -1491,7 +1491,7 @@
     <div class="app-dialog-actions" style="justify-content: flex-start; gap: 8px; flex-wrap: wrap; align-items: center;">
       <button class="btn" type="button" id="manualImageBackend" title="Change SkyStats backend URL (for Tailscale or remote access)">Change backend URL…</button>
       <button class="btn" type="button" id="manualImageSelfUpdate" title="Pull the latest index.html from GitHub main and reload">Update from GitHub…</button>
-      <span class="app-version" title="App version (bump in index.html when releasing)">v1.11.2</span>
+      <span class="app-version" title="App version (bump in index.html when releasing)">v1.12.0</span>
     </div>
   </div>
 </div>
@@ -1792,8 +1792,11 @@ async function fetchSection(section, signal, cacheBust) {
 
 function computeSignature(arr) {
   if (!arr || !arr.length) return '0';
-  const first = arr[0], last = arr[arr.length - 1];
-  return `${arr.length}|${first.hex}:${first.seen_epoch}|${last.hex}:${last.seen_epoch}`;
+  // Fold every entry so mid-list updates (same length, same endpoints) are still
+  // detected. O(n) over already-in-memory arrays — negligible next to a render.
+  let sig = String(arr.length);
+  for (const p of arr) sig += `|${p.hex}:${p.seen_epoch}`;
+  return sig;
 }
 
 function diffHexes(section, arr) {
@@ -1836,9 +1839,11 @@ async function fetchAll(manual) {
       gov: computeSignature(data.gov),
       civ: computeSignature(data.civ),
     };
-    const changed = newSig.mil !== dataSig.mil
-                 || newSig.gov !== dataSig.gov
-                 || newSig.civ !== dataSig.civ;
+    // Only the active section is on screen, so re-render just when its content
+    // changed (or on a manual refresh). A change in a hidden section still
+    // updates the counts/chips below but doesn't force a grid rebuild.
+    const activeChanged = activeSection !== 'stats'
+      && newSig[activeSection] !== dataSig[activeSection];
 
     diffHexes('mil', data.mil);
     diffHexes('gov', data.gov);
@@ -1849,7 +1854,7 @@ async function fetchAll(manual) {
     updateStats();
     buildCategoryChips();
 
-    if (changed || manual) {
+    if (activeChanged || manual) {
       if (modalHex) {
         // Don't disturb the DOM while the user has the modal open.
         pendingRender = true;
@@ -2308,10 +2313,14 @@ function buildCategoryChips() {
   });
 }
 
+// Escape for both text and double-quoted attribute contexts. String-based so it
+// also escapes " and ' (a bare textContent->innerHTML leaves those intact), and
+// coerces null/undefined to '' (so sparse records don't render the word
+// "undefined"). Pure string replace avoids a DOM allocation per call.
+const ESC_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 function esc(s) {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/[&<>"']/g, c => ESC_MAP[c]);
 }
 
 function getFiltered() {
@@ -2332,7 +2341,7 @@ function getFiltered() {
   const cmpStr = (a, b) => (a || '').localeCompare(b || '');
   filtered.sort((a, b) => {
     switch (key) {
-      case 'seen':      return (a.seen_epoch - b.seen_epoch) * mult;
+      case 'seen':      return ((a.seen_epoch || 0) - (b.seen_epoch || 0)) * mult;
       case 'type':      return cmpStr(a.type, b.type) * mult;
       case 'operator':  return cmpStr(a.operator, b.operator) * mult;
       case 'callsign':  return cmpStr(a.flight, b.flight) * mult;
@@ -2398,6 +2407,7 @@ function findPlane(hex) {
 }
 
 function timeAgo(epoch) {
+  if (!epoch) return '—';   // imported/backup planes may lack a seen_epoch
   const diff = Math.floor(Date.now() / 1000) - epoch;
   if (diff < 60) return 'just now';
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
@@ -2406,6 +2416,7 @@ function timeAgo(epoch) {
 }
 
 function freshClass(epoch) {
+  if (!epoch) return 'fresh-stale';
   const diff = Math.floor(Date.now() / 1000) - epoch;
   if (diff < 3600) return 'fresh-live';
   if (diff < 86400) return 'fresh-recent';
@@ -2422,6 +2433,7 @@ function formatTime(date) {
 }
 
 function formatDateTime(date) {
+  if (!(date instanceof Date) || isNaN(date.getTime())) return '---';
   return date.toLocaleString([], {
     year: 'numeric',
     month: 'numeric',
@@ -2924,7 +2936,8 @@ async function saveManualImageEntry() {
   resetImageIndex(hex);
   populateManualImageSelect(hex);
   fillManualImageFields(hex);
-  if (modalHex === hex) openModal(hex);
+  // modalHex is stored raw from dataset.hex (lowercase); hex here is normalized.
+  if (normalizeHex(modalHex) === hex) openModal(modalHex);
   preservingScroll(render);
 }
 
@@ -2981,7 +2994,8 @@ async function removeManualImageEntry() {
   updatedPill.textContent = `Removed manual image links for ${hex}`;
   populateManualImageSelect(hex);
   fillManualImageFields(hex);
-  if (modalHex === hex) openModal(hex);
+  // modalHex is stored raw from dataset.hex (lowercase); hex here is normalized.
+  if (normalizeHex(modalHex) === hex) openModal(modalHex);
   preservingScroll(render);
 }
 
@@ -3392,28 +3406,77 @@ function groupBadge(p) {
   return '';
 }
 
+// Incremental rendering: paint the first chunk immediately, then append the rest
+// as a sentinel near the end scrolls into view. Keeps the initial DOM small even
+// when the SkyStats limit is raised to thousands of aircraft.
+const RENDER_CHUNK = 80;
+let renderState = null;      // { items, fresh, mode, cursor }
+let renderObserver = null;   // IntersectionObserver watching the sentinel
+
+function teardownRenderObserver() {
+  if (renderObserver) { renderObserver.disconnect(); renderObserver = null; }
+  const s = document.getElementById('renderSentinel');
+  if (s) s.remove();
+  renderState = null;
+}
+
+function appendRenderChunk() {
+  if (!renderState) return;
+  const { items, fresh, mode, cursor } = renderState;
+  const end = Math.min(cursor + RENDER_CHUNK, items.length);
+  const container = mode === 'grid'
+    ? document.querySelector('#content .grid')
+    : document.querySelector('#content tbody');
+  if (!container) { teardownRenderObserver(); return; }
+  const builder = mode === 'grid' ? cardHTML : rowHTML;
+  let html = '';
+  for (let i = cursor; i < end; i++) html += builder(items[i], fresh);
+  container.insertAdjacentHTML('beforeend', html);
+  renderState.cursor = end;
+  if (end >= items.length) teardownRenderObserver();
+}
+
+function setupChunkedRender(items, fresh, mode, cursor) {
+  const sentinel = document.getElementById('renderSentinel');
+  if (!sentinel) return;
+  renderState = { items, fresh, mode, cursor };
+  renderObserver = new IntersectionObserver((entries) => {
+    if (!entries[entries.length - 1].isIntersecting) return;
+    appendRenderChunk();
+    // IntersectionObserver only fires on state changes; if the sentinel is still
+    // in view after appending, re-observe to force another evaluation.
+    if (renderState && renderObserver) {
+      renderObserver.unobserve(sentinel);
+      renderObserver.observe(sentinel);
+    }
+  }, { rootMargin: '800px 0px' });
+  renderObserver.observe(sentinel);
+}
+
 function render() {
+  teardownRenderObserver();
   const items = getFiltered();
   if (items.length === 0) {
     document.getElementById('content').innerHTML = '<div class="status-msg">No aircraft match your filters.</div>';
     return;
   }
-  if (view === 'grid') renderGrid(items);
-  else renderTable(items);
+  const fresh = newHexes[activeSection] || new Set();
+  if (view === 'grid') renderGrid(items, fresh);
+  else renderTable(items, fresh);
 }
 
-function renderGrid(items) {
-  const fresh = newHexes[activeSection] || new Set();
-  const html = items.map(p => {
-    const imgs = getImages(p);
-    const idx = imageIndices[p.hex] || 0;
-    const imgSrc = imgs[idx] || '';
-    const dots = imgs.map((_, i) => `<span class="${i === idx ? 'active' : ''}"></span>`).join('');
-    const grp = (p.group || '').toLowerCase();
-    const cardClass = grp === 'gov' ? ' card-gov' : grp === 'civ' ? ' card-civ' : '';
-    const newClass = fresh.has(p.hex) ? ' card--new' : '';
+// Single-card / single-row builders, reused for both the initial paint and the
+// incremental chunk appends.
+function cardHTML(p, fresh) {
+  const imgs = getImages(p);
+  const idx = imageIndices[p.hex] || 0;
+  const imgSrc = imgs[idx] || '';
+  const dots = imgs.map((_, i) => `<span class="${i === idx ? 'active' : ''}"></span>`).join('');
+  const grp = (p.group || '').toLowerCase();
+  const cardClass = grp === 'gov' ? ' card-gov' : grp === 'civ' ? ' card-civ' : '';
+  const newClass = fresh.has(p.hex) ? ' card--new' : '';
 
-    return `
+  return `
     <div class="card${cardClass}${newClass}" data-hex="${esc(p.hex)}">
       <div class="card-img-wrap">
         ${imgs.length ? imgTag(imgSrc, p) : placeholderTag(p)}
@@ -3445,20 +3508,15 @@ function renderGrid(items) {
         </div>
       </div>
     </div>`;
-  }).join('');
-
-  document.getElementById('content').innerHTML = `<div class="grid">${html}</div>`;
 }
 
-function renderTable(items) {
-  const fresh = newHexes[activeSection] || new Set();
-  const rows = items.map(p => {
-    const img = getImages(p)[0] || '';
-    const grp = (p.group || '').toLowerCase();
-    const badgeClass = grp === 'gov' ? 'badge-gov' : grp === 'civ' ? 'badge-civ' : 'badge-mil';
-    const badgeLabel = grp === 'gov' ? 'GOV' : grp === 'civ' ? 'CIV' : 'MIL';
-    const rowCls = fresh.has(p.hex) ? ' row--new' : '';
-    return `<tr class="${rowCls.trim()}" data-hex="${esc(p.hex)}" data-action="open-modal" style="cursor:pointer">
+function rowHTML(p, fresh) {
+  const img = getImages(p)[0] || '';
+  const grp = (p.group || '').toLowerCase();
+  const badgeClass = grp === 'gov' ? 'badge-gov' : grp === 'civ' ? 'badge-civ' : 'badge-mil';
+  const badgeLabel = grp === 'gov' ? 'GOV' : grp === 'civ' ? 'CIV' : 'MIL';
+  const rowCls = fresh.has(p.hex) ? ' row--new' : '';
+  return `<tr class="${rowCls.trim()}" data-hex="${esc(p.hex)}" data-action="open-modal" style="cursor:pointer">
       <td><span class="tbl-badge ${badgeClass}">${badgeLabel}</span></td>
       <td>${img ? imgTag(img, p, 'table-thumb') : `<span class="table-thumb img-placeholder"><span class="ph-type">${esc(p.type || p.icao_type || '')}</span></span>`}</td>
       <td><strong>${esc(p.type || p.icao_type)}</strong></td>
@@ -3470,7 +3528,23 @@ function renderTable(items) {
       <td><span class="freshness ${freshClass(p.seen_epoch)}"></span> ${timeAgo(p.seen_epoch)}</td>
       <td>${[p.tag1, p.tag2, p.tag3].filter(Boolean).map(t => `<span class="tag">${esc(t)}</span>`).join(' ')}</td>
     </tr>`;
-  }).join('');
+}
+
+function renderGrid(items, fresh) {
+  const firstCount = Math.min(RENDER_CHUNK, items.length);
+  let html = '';
+  for (let i = 0; i < firstCount; i++) html += cardHTML(items[i], fresh);
+  const needMore = items.length > firstCount;
+  document.getElementById('content').innerHTML =
+    `<div class="grid">${html}</div>` + (needMore ? '<div id="renderSentinel" aria-hidden="true"></div>' : '');
+  if (needMore) setupChunkedRender(items, fresh, 'grid', firstCount);
+}
+
+function renderTable(items, fresh) {
+  const firstCount = Math.min(RENDER_CHUNK, items.length);
+  let rows = '';
+  for (let i = 0; i < firstCount; i++) rows += rowHTML(items[i], fresh);
+  const needMore = items.length > firstCount;
 
   const ind = (k) => {
     if (sortState.key !== k) return '<span class="sort-ind">↕</span>';
@@ -3495,7 +3569,8 @@ function renderTable(items) {
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
-    </div>`;
+    </div>${needMore ? '<div id="renderSentinel" aria-hidden="true"></div>' : ''}`;
+  if (needMore) setupChunkedRender(items, fresh, 'table', firstCount);
 }
 
 function cycleImg(hex, dir) {
@@ -3635,9 +3710,18 @@ document.addEventListener('keydown', e => {
 
 // --- Debounced search ---
 let searchTimer = null;
+let lastSearchQuery = '';
 document.getElementById('searchInput').addEventListener('input', () => {
   if (searchTimer) clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => { searchTimer = null; render(); }, 120);
+  searchTimer = setTimeout(() => {
+    searchTimer = null;
+    // Skip the (potentially large) re-render when the effective query is
+    // unchanged, e.g. arrow keys or edits that leave the trimmed text the same.
+    const q = document.getElementById('searchInput').value.toLowerCase().trim();
+    if (q === lastSearchQuery) return;
+    lastSearchQuery = q;
+    render();
+  }, 120);
 });
 
 document.getElementById('sortSelect').addEventListener('change', (e) => {
@@ -4377,9 +4461,18 @@ function measureCollapsible() {
 }
 
 // Re-measure on resize and after content renders (chips/controls may grow).
+// measureCollapsible forces a synchronous reflow (height:auto -> read
+// scrollHeight -> restore), so coalesce bursts of resize events to one measure
+// per frame via rAF. isMobile is cheap and stays eagerly updated.
+let resizeTicking = false;
 window.addEventListener('resize', () => {
   isMobile = window.matchMedia('(max-width: 640px)').matches;
-  measureCollapsible();
+  if (resizeTicking) return;
+  resizeTicking = true;
+  requestAnimationFrame(() => {
+    resizeTicking = false;
+    measureCollapsible();
+  });
 }, { passive: true });
 
 // Hook into render so chip changes update the measured height.
