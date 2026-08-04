@@ -1491,7 +1491,7 @@
     <div class="app-dialog-actions" style="justify-content: flex-start; gap: 8px; flex-wrap: wrap; align-items: center;">
       <button class="btn" type="button" id="manualImageBackend" title="Change SkyStats backend URL (for Tailscale or remote access)">Change backend URL…</button>
       <button class="btn" type="button" id="manualImageSelfUpdate" title="Pull the latest index.html from GitHub main and reload">Update from GitHub…</button>
-      <span class="app-version" title="App version (bump in index.html when releasing)">v1.12.1</span>
+      <span class="app-version" title="App version (bump in index.html when releasing)">v1.13.0</span>
     </div>
   </div>
 </div>
@@ -1560,15 +1560,22 @@ function defaultApiBase() {
 }
 
 let API_BASE = loadStoredApiBase() || defaultApiBase();
+// SkyStats splits interesting aircraft four ways (Mil / Gov / Civ / Pol) but this
+// GUI only has three tabs. Police airframes are state-operated law enforcement
+// rather than armed forces, so they're folded into Government everywhere: the
+// live feed, the group badges, and the import normalizer all point here.
+const POLICE_SECTION = 'gov';
 const API = {
   mil: '',
   gov: '',
   civ: '',
+  pol: '',
 };
 function rebuildApi() {
   API.mil = `${API_BASE}/api/stats/interesting/military`;
   API.gov = `${API_BASE}/api/stats/interesting/government`;
   API.civ = `${API_BASE}/api/stats/interesting/civilian`;
+  API.pol = `${API_BASE}/api/stats/interesting/police`;
 }
 rebuildApi();
 // Feeder-wide SkyStats endpoints powering the Stats dashboard. Built against
@@ -1790,6 +1797,28 @@ async function fetchSection(section, signal, cacheBust) {
   return res.json();
 }
 
+// The police feed arrived later than the other interesting endpoints, so an older
+// SkyStats build can 404 it. Treat that as an empty list instead of failing the
+// whole refresh — aborts still propagate so fetchAll's cancel logic is unchanged.
+async function fetchPolice(signal, cacheBust) {
+  try {
+    return await fetchSection('pol', signal, cacheBust);
+  } catch (err) {
+    if (err.name === 'AbortError') throw err;
+    console.info(`Police feed unavailable (${err.message}); continuing without it.`);
+    return [];
+  }
+}
+
+// Fold the police feed into its host section. mergeSection() keys by hex, so an
+// aircraft that shows up in both feeds collapses to a single entry.
+function foldPolice(sections, police) {
+  const pol = Array.isArray(police) ? police : [];
+  if (!pol.length) return sections;
+  const host = POLICE_SECTION;
+  return { ...sections, [host]: [...(sections[host] || []), ...pol] };
+}
+
 function computeSignature(arr) {
   if (!arr || !arr.length) return '0';
   // Fold every entry so mid-list updates (same length, same endpoints) are still
@@ -1825,13 +1854,14 @@ async function fetchAll(manual) {
   if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
 
   try {
-    const [mil, gov, civ] = await Promise.all([
+    const [mil, gov, civ, pol] = await Promise.all([
       fetchSection('mil', controller.signal, manual),
       fetchSection('gov', controller.signal, manual),
       fetchSection('civ', controller.signal, manual),
+      fetchPolice(controller.signal, manual),
     ]);
 
-    receiverData = { mil, gov, civ };
+    receiverData = foldPolice({ mil, gov, civ }, pol);
     refreshMergedData();
 
     const newSig = {
@@ -2014,12 +2044,13 @@ async function fetchMine(manual) {
   if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
 
   try {
-    const [mil, gov, civ] = await Promise.all([
+    const [mil, gov, civ, pol] = await Promise.all([
       fetchSection('mil', controller.signal, manual),
       fetchSection('gov', controller.signal, manual),
       fetchSection('civ', controller.signal, manual),
+      fetchPolice(controller.signal, manual),
     ]);
-    receiverData = { mil, gov, civ };
+    receiverData = foldPolice({ mil, gov, civ }, pol);
     refreshMergedData();
     statsUpdatedStr = formatTime(new Date());
     if (activeSection === 'stats' && statsView === 'mine' && !modalHex) renderStats();
@@ -3094,8 +3125,9 @@ function parseCSV(text) {
 }
 
 function sectionFromImportFilename(filename) {
-  const match = filename.toLowerCase().match(/aircraft-(mil|gov|civ)-/);
-  return match ? match[1] : activeSection;
+  const match = filename.toLowerCase().match(/aircraft-(mil|gov|civ|pol)-/);
+  if (!match) return activeSection;
+  return match[1] === 'pol' ? POLICE_SECTION : match[1];
 }
 
 function parseImport(text, filename) {
@@ -3118,7 +3150,7 @@ function normalizeGroup(group, fallbackSection) {
   if (g.startsWith('gov')) return 'gov';
   if (g.startsWith('civ')) return 'civ';
   if (g.startsWith('mil')) return 'mil';
-  if (g.startsWith('pol')) return 'gov';
+  if (g.startsWith('pol')) return POLICE_SECTION;
   return fallbackSection;
 }
 
@@ -3408,8 +3440,16 @@ async function importFile(file) {
   await importAircraft(items, file.name);
 }
 
+// The badge/colour group for a plane. Live police records come back tagged "Pol",
+// which has no tab, badge or colour of its own — render those as Government so
+// they match the section they were folded into.
+function displayGroup(p) {
+  const g = String(p.group || '').toLowerCase();
+  return g.startsWith('pol') ? POLICE_SECTION : g;
+}
+
 function groupBadge(p) {
-  const g = (p.group || '').toLowerCase();
+  const g = displayGroup(p);
   if (g === 'mil') return '<span class="card-group-badge badge-mil">MIL</span>';
   if (g === 'gov') return '<span class="card-group-badge badge-gov">GOV</span>';
   if (g === 'civ') return '<span class="card-group-badge badge-civ">CIV</span>';
@@ -3482,7 +3522,7 @@ function cardHTML(p, fresh) {
   const idx = imageIndices[p.hex] || 0;
   const imgSrc = imgs[idx] || '';
   const dots = imgs.map((_, i) => `<span class="${i === idx ? 'active' : ''}"></span>`).join('');
-  const grp = (p.group || '').toLowerCase();
+  const grp = displayGroup(p);
   const cardClass = grp === 'gov' ? ' card-gov' : grp === 'civ' ? ' card-civ' : '';
   const newClass = fresh.has(p.hex) ? ' card--new' : '';
 
@@ -3522,7 +3562,7 @@ function cardHTML(p, fresh) {
 
 function rowHTML(p, fresh) {
   const img = getImages(p)[0] || '';
-  const grp = (p.group || '').toLowerCase();
+  const grp = displayGroup(p);
   const badgeClass = grp === 'gov' ? 'badge-gov' : grp === 'civ' ? 'badge-civ' : 'badge-mil';
   const badgeLabel = grp === 'gov' ? 'GOV' : grp === 'civ' ? 'CIV' : 'MIL';
   const rowCls = fresh.has(p.hex) ? ' row--new' : '';
@@ -3634,7 +3674,7 @@ function openModal(hex) {
     mainSlot.innerHTML = `<div class="modal-img img-placeholder"><div class="ph-type">${esc(p.type || p.icao_type || '')}</div><div class="ph-op">${esc(p.operator || '')}</div></div>`;
   }
 
-  const grp = (p.group || '').toLowerCase();
+  const grp = displayGroup(p);
   const badgeClass = grp === 'gov' ? 'badge-gov' : grp === 'civ' ? 'badge-civ' : 'badge-mil';
   const badgeLabel = grp === 'gov' ? 'GOV' : grp === 'civ' ? 'CIV' : 'MIL';
   document.getElementById('modalType').innerHTML =

@@ -14,6 +14,7 @@ It's also optimised for mobile since that was my main priority.
 
 **Browsing**
 - Military, government, and civilian tabs backed by the SkyStats interesting-aircraft endpoints.
+- SkyStats' fourth feed, police, is folded into the government tab rather than getting a tab of its own — law-enforcement airframes are state-operated, not armed forces. They keep their `Police` category, so the category chips still let you filter them out on their own. Backends too old to serve `/api/stats/interesting/police` are handled gracefully: the feed is skipped and everything else loads as normal.
 - Grid and table views for stepping through a large aircraft history.
 - Search across type, operator, callsign, ICAO, registration, category, and tags.
 - Sort by last seen, type, operator, or category.
@@ -31,7 +32,7 @@ It's also optimised for mobile since that was my main priority.
   - Top airlines, busiest routes, top domestic and international airports, and origin and destination countries.
 - My aircraft stats are computed in the browser from the logged mil/gov/civ lists:
   - Activity summary: aircraft logged, new in the last 24h, busiest hour and day, and the last-seen date range.
-  - Breakdown by group (military, government, civilian).
+  - Breakdown by group (military, government, civilian — police counted under government).
   - Seen by hour of day and by day of week (based on each aircraft's last-seen time).
   - Top operators, types, tags, and categories.
 - Dependency-free CSS bar charts that pack neatly and stay readable on mobile.
