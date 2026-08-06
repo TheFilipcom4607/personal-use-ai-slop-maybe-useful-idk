@@ -1339,6 +1339,62 @@
     white-space: normal;
     word-break: break-all;
   }
+
+  /* Data warnings: shown when the list on screen is known to be incomplete
+     (backend returning fewer aircraft than before, shared backup not loading).
+     Missing data is otherwise indistinguishable from "nothing was seen". */
+  .data-warning {
+    padding: 8px 20px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .data-warning-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 9px 12px;
+    border: 1px solid var(--amber);
+    border-radius: 8px;
+    background: rgba(226, 180, 66, 0.12);
+    font-size: 0.82rem;
+    line-height: 1.4;
+  }
+  .data-warning-icon {
+    flex: 0 0 auto;
+    width: 17px;
+    height: 17px;
+    margin-top: 1px;
+    border-radius: 50%;
+    background: var(--amber);
+    color: #1a1c24;
+    font-weight: 700;
+    font-size: 0.72rem;
+    text-align: center;
+    line-height: 17px;
+  }
+  .data-warning-text { flex: 1 1 auto; color: var(--text); }
+  .data-warning-detail {
+    display: block;
+    margin-top: 3px;
+    color: var(--text-dim);
+    font-size: 0.78rem;
+  }
+  .data-warning-x {
+    flex: 0 0 auto;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 2px;
+  }
+  .data-warning-x:hover { color: var(--text); }
+
+  @media (max-width: 640px) {
+    .data-warning { padding: 8px 12px 0; }
+  }
 </style>
 </head>
 <body>
@@ -1366,6 +1422,7 @@
       Stats
     </button>
   </div>
+  <div class="data-warning" id="dataWarning" role="status" hidden></div>
   <div class="header-collapsible" id="headerCollapsible">
     <div class="controls">
       <div class="search-box">
@@ -1491,7 +1548,7 @@
     <div class="app-dialog-actions" style="justify-content: flex-start; gap: 8px; flex-wrap: wrap; align-items: center;">
       <button class="btn" type="button" id="manualImageBackend" title="Change SkyStats backend URL (for Tailscale or remote access)">Change backend URL…</button>
       <button class="btn" type="button" id="manualImageSelfUpdate" title="Pull the latest index.html from GitHub main and reload">Update from GitHub…</button>
-      <span class="app-version" title="App version (bump in index.html when releasing)">v1.13.0</span>
+      <span class="app-version" title="App version (bump in index.html when releasing)">v1.14.0</span>
     </div>
   </div>
 </div>
@@ -1611,6 +1668,14 @@ const REFRESH_INTERVAL = 60000;
 const FETCH_TIMEOUT = 10000;
 const IMPORT_STORAGE_KEY = 'adsbdisplay.importedSnapshot.v1';
 const MANUAL_IMAGE_STORAGE_KEY = 'adsbdisplay.manualImages.v1';
+// High-water mark of live aircraft per section, so a backend that quietly starts
+// returning fewer aircraft is flagged instead of just looking like a quiet week.
+const LIVE_BASELINE_KEY = 'adsbdisplay.liveBaseline.v1';
+// Set once a server-side backup has loaded here, so a later failure can be told
+// apart from "this Pi never had the sidecar installed".
+const SERVER_BACKUP_SEEN_KEY = 'adsbdisplay.serverBackupSeen.v1';
+const LIVE_DROP_RATIO = 0.7;  // warn below 70% of the high-water mark...
+const LIVE_DROP_MIN = 3;      // ...but only once at least 3 aircraft are missing
 // Sidecar service (funplaneviewer-uploads) fronted by nginx on the same origin
 // as the GUI. See server/README.md.
 const UPLOADS_API_BASE = '/api/uploads';
@@ -1757,6 +1822,107 @@ function setSourceMode() {
     : '<span class="live-dot"></span> Live';
 }
 
+// --- Data warnings ---
+// A short list is ambiguous: it can mean "nothing was seen" or "the data source
+// quietly stopped handing it over". These surface the second case so it doesn't
+// read as missing aircraft.
+
+const warnings = new Map();  // id -> { text, detail }
+
+function renderWarnings() {
+  const box = document.getElementById('dataWarning');
+  if (!box) return;
+  if (!warnings.size) {
+    box.hidden = true;
+    box.innerHTML = '';
+    return;
+  }
+  box.hidden = false;
+  box.innerHTML = [...warnings.entries()].map(([id, w]) => `
+    <div class="data-warning-row">
+      <span class="data-warning-icon" aria-hidden="true">!</span>
+      <span class="data-warning-text">${esc(w.text)}${
+        w.detail ? `<span class="data-warning-detail">${esc(w.detail)}</span>` : ''}</span>
+      <button class="data-warning-x" data-warning-dismiss="${esc(id)}" aria-label="Dismiss warning">&times;</button>
+    </div>`).join('');
+}
+
+function setWarning(id, text, detail) {
+  const prev = warnings.get(id);
+  if (prev && prev.text === text && prev.detail === detail) return;
+  warnings.set(id, { text, detail });
+  renderWarnings();
+}
+
+function clearWarning(id) {
+  if (warnings.delete(id)) renderWarnings();
+}
+
+function dismissWarning(id) {
+  // Dismissing re-baselines, so the same warning doesn't fire again next poll.
+  if (id === 'live-drop') saveLiveBaseline(liveCounts());
+  if (id === 'server-backup') {
+    try { localStorage.removeItem(SERVER_BACKUP_SEEN_KEY); } catch (err) { /* private mode */ }
+  }
+  clearWarning(id);
+}
+
+function liveCounts() {
+  return {
+    mil: (receiverData.mil || []).length,
+    gov: (receiverData.gov || []).length,
+    civ: (receiverData.civ || []).length,
+  };
+}
+
+function loadLiveBaseline() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(LIVE_BASELINE_KEY) || 'null');
+    if (stored && stored.peak && typeof stored.peak === 'object') return { ...stored.peak };
+  } catch (err) { /* corrupt entry; fall through to a fresh baseline */ }
+  return { mil: 0, gov: 0, civ: 0 };
+}
+
+function saveLiveBaseline(peak) {
+  try {
+    localStorage.setItem(LIVE_BASELINE_KEY, JSON.stringify({ peak, savedAt: Date.now() }));
+  } catch (err) {
+    console.warn('Could not persist the live-count baseline', err);
+  }
+}
+
+// Compare each live section against its high-water mark. The baseline is
+// persisted, so a drop is still caught after a reload — which is exactly when
+// you'd hit it, since a reload resets any in-memory comparison.
+function checkLiveCounts() {
+  const labels = { mil: 'Military', gov: 'Government', civ: 'Civilian' };
+  const now = liveCounts();
+  const peak = loadLiveBaseline();
+  const shrunk = [];
+  let grew = false;
+
+  ['mil', 'gov', 'civ'].forEach(section => {
+    const count = now[section];
+    const was = peak[section] || 0;
+    if (count > was) {
+      peak[section] = count;
+      grew = true;
+    } else if (was - count >= LIVE_DROP_MIN && count < was * LIVE_DROP_RATIO) {
+      shrunk.push(`${labels[section]} ${was} → ${count}`);
+    }
+  });
+
+  if (grew) saveLiveBaseline(peak);
+
+  if (shrunk.length) {
+    setWarning('live-drop',
+      `The backend is returning fewer aircraft than it used to (${shrunk.join(', ')}).`,
+      'Your imported backups are unaffected. This usually means the SkyStats API is truncating its response rather than aircraft being deleted — check the endpoint against the database. Dismiss to accept the new count.');
+  } else {
+    clearWarning('live-drop');
+  }
+}
+
 function valueOrFallback(value, fallback) {
   return value === undefined || value === null || value === '' ? fallback : value;
 }
@@ -1862,6 +2028,7 @@ async function fetchAll(manual) {
     ]);
 
     receiverData = foldPolice({ mil, gov, civ }, pol);
+    checkLiveCounts();
     refreshMergedData();
 
     const newSig = {
@@ -2051,6 +2218,7 @@ async function fetchMine(manual) {
       fetchPolice(controller.signal, manual),
     ]);
     receiverData = foldPolice({ mil, gov, civ }, pol);
+    checkLiveCounts();
     refreshMergedData();
     statsUpdatedStr = formatTime(new Date());
     if (activeSection === 'stats' && statsView === 'mine' && !modalHex) renderStats();
@@ -2608,6 +2776,10 @@ async function loadServerBackup() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const snapshot = await res.json();
     if (!snapshot || !snapshot.backups) return false;
+    // Reaching a real snapshot means the sidecar is set up on this origin, so a
+    // future failure is a genuine problem rather than "never installed".
+    try { localStorage.setItem(SERVER_BACKUP_SEEN_KEY, '1'); } catch (err) { /* private mode */ }
+    clearWarning('server-backup');
     const sections = ['mil', 'gov', 'civ'];
     let added = 0;
     sections.forEach(section => {
@@ -2629,7 +2801,20 @@ async function loadServerBackup() {
     }
     return added > 0;
   } catch (err) {
-    console.info('Server-side backup snapshot unavailable:', err.message);
+    // The sidecar is optional, so only complain to someone who has loaded a
+    // server snapshot in this browser before. For them a failure means aircraft
+    // are silently missing from the list — most often because /api/uploads/ is
+    // not proxied on the hostname they're using (Tailscale vs the LAN name),
+    // and localStorage is per-origin so there's no local copy to fall back on.
+    let seenBefore = false;
+    try { seenBefore = localStorage.getItem(SERVER_BACKUP_SEEN_KEY) === '1'; } catch (e) { /* private mode */ }
+    if (seenBefore) {
+      setWarning('server-backup',
+        'Could not load the shared backup from the Pi.',
+        `Imported aircraft saved on the server are missing from this list (${err.message}). If you're on a different hostname than usual, check that nginx proxies /api/uploads/ there.`);
+    } else {
+      console.info('Server-side backup snapshot unavailable:', err.message);
+    }
     return false;
   }
 }
@@ -2648,8 +2833,17 @@ async function postServerBackup(section, filename) {
     body: JSON.stringify(payload)
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`HTTP ${res.status}${text ? `: ${text}` : ''}`);
+    // The sidecar sends JSON {error}; nginx and Flask's own aborts send HTML.
+    // Either way this text ends up in a dialog, so unwrap it.
+    const raw = await res.text().catch(() => '');
+    let detail = raw;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.error) detail = parsed.error;
+    } catch (err) {
+      detail = raw.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    throw new Error(`HTTP ${res.status}${detail ? `: ${detail.slice(0, 300)}` : ''}`);
   }
 }
 
@@ -4601,6 +4795,11 @@ document.addEventListener('visibilitychange', () => {
     else fetchAll(false);
     startPolling();
   }
+});
+
+document.getElementById('dataWarning').addEventListener('click', e => {
+  const btn = e.target.closest('[data-warning-dismiss]');
+  if (btn) dismissWarning(btn.getAttribute('data-warning-dismiss'));
 });
 
 loadManualImages();

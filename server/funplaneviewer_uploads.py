@@ -11,6 +11,8 @@ Storage:
       $ICAO,$Registration,#ImageLink,#ImageLink2,#ImageLink3,#ImageLink4
   $DATA_DIR/backup.json - JSON snapshot, same shape as the
       browser's `importedBackups` { mil, gov, civ } object.
+  $DATA_DIR/backup-history/backup-<UTC timestamp>.json - the previous
+      snapshot, kept on every write (see BACKUP_HISTORY_KEEP).
 
 No auth: meant to sit behind nginx on a LAN/Tailscale-only host.
 """
@@ -20,10 +22,12 @@ import hashlib
 import io
 import json
 import os
+import shutil
 import threading
 import time
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 
 from flask import Flask, abort, jsonify, request, send_file
@@ -31,6 +35,8 @@ from flask import Flask, abort, jsonify, request, send_file
 DATA_DIR = Path(os.environ.get("FUNPLANEVIEWER_DATA_DIR", "/opt/funplaneviewer/data"))
 IMAGES_CSV = DATA_DIR / "images.csv"
 BACKUP_JSON = DATA_DIR / "backup.json"
+BACKUP_HISTORY_DIR = DATA_DIR / "backup-history"
+BACKUP_HISTORY_KEEP = int(os.environ.get("FUNPLANEVIEWER_BACKUP_HISTORY", "10"))
 PORT = int(os.environ.get("PORT", "5174"))
 HOST = os.environ.get("HOST", "127.0.0.1")
 
@@ -191,10 +197,70 @@ def get_backup():
     return jsonify(data)
 
 
+def _read_backup_file():
+    """The stored snapshot as a dict, or None when it is absent or unreadable."""
+    if not BACKUP_JSON.exists():
+        return None
+    try:
+        with BACKUP_JSON.open("r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return None
+
+
+def _rotate_backup() -> None:
+    """Copy the current snapshot into backup-history/ before it is replaced.
+
+    Writes here are wholesale replacements, so without this a single bad save
+    (an import from a browser whose local backups never loaded, say) would
+    destroy the only copy. Keeps the newest BACKUP_HISTORY_KEEP snapshots.
+    """
+    if not BACKUP_JSON.exists():
+        return
+    try:
+        BACKUP_HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        shutil.copy2(BACKUP_JSON, BACKUP_HISTORY_DIR / f"backup-{stamp}.json")
+    except OSError as err:
+        # Rotation is best-effort; never block a save because history failed.
+        app.logger.warning("Could not rotate backup.json: %s", err)
+        return
+
+    for old in sorted(BACKUP_HISTORY_DIR.glob("backup-*.json"))[:-BACKUP_HISTORY_KEEP]:
+        try:
+            old.unlink()
+        except OSError:
+            pass
+
+
+@app.get("/api/uploads/backup/history")
+def get_backup_history():
+    """List retained snapshots, newest first, for manual recovery."""
+    if not BACKUP_HISTORY_DIR.exists():
+        return jsonify(history=[])
+    entries = []
+    for path in sorted(BACKUP_HISTORY_DIR.glob("backup-*.json"), reverse=True):
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        entries.append({
+            "name": path.name,
+            "bytes": stat.st_size,
+            "modified": datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat(),
+        })
+    return jsonify(history=entries)
+
+
 @app.post("/api/uploads/backup")
 def put_backup():
-    """Body: { version, section?, filename?, savedAt?, backups: { mil, gov, civ } }
-    Replaces the stored backup wholesale (matches the client snapshot model)."""
+    """Body: { version, section?, filename?, savedAt?, force?, backups: { mil, gov, civ } }
+    Replaces the stored backup wholesale (matches the client snapshot model).
+
+    The previous snapshot is rotated into backup-history/ first, and a write that
+    would empty a section that currently has aircraft is rejected with 409 unless
+    the caller sets force=true.
+    """
     payload = request.get_json(silent=True) or {}
     backups = payload.get("backups")
     if not isinstance(backups, dict):
@@ -217,6 +283,27 @@ def put_backup():
 
     _ensure_data_dir()
     with _lock:
+        existing = _read_backup_file()
+        if existing and not payload.get("force"):
+            previous = existing.get("backups") or {}
+            emptied = [
+                f"{section}: {len(previous.get(section) or [])} -> 0"
+                for section in ("mil", "gov", "civ")
+                if (previous.get(section) or []) and not cleaned["backups"][section]
+            ]
+            if emptied:
+                # JSON rather than abort(): the client shows this text to the
+                # user, and abort() would hand it a full HTML error page.
+                return jsonify(
+                    ok=False,
+                    emptied=emptied,
+                    error="Refusing to wipe saved aircraft (" + ", ".join(emptied)
+                          + "). This browser has no backups loaded, so saving would "
+                            "replace the ones on the Pi with nothing. Resend with "
+                            "force=true if you really mean to clear them.",
+                ), 409
+
+        _rotate_backup()
         tmp = BACKUP_JSON.with_suffix(".json.tmp")
         with tmp.open("w", encoding="utf-8") as fh:
             json.dump(cleaned, fh, ensure_ascii=False, indent=2)

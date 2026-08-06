@@ -7,6 +7,8 @@ shared, server-side data:
   as the upstream `plane_images.csv` (so the existing image-pull merge
   logic still applies).
 - `backup.json`: the same shape the GUI's `Import` button produces.
+- `backup-history/`: the previous `backup.json` on every write, kept so a
+  bad save can be undone (see [Backup safety](#backup-safety)).
 
 It's a sidecar because the existing nginx-served static site can't
 accept POSTs. nginx fronts the sidecar at `/api/uploads/` so the GUI
@@ -21,12 +23,44 @@ just talks to the page's own origin.
 | POST   | `/api/uploads/images`             | `{ "hex": "A1B2C3", "registration": "...", "links": ["https://...", ...] }`, empty `links` deletes the row |
 | DELETE | `/api/uploads/images/<hex>`       | Removes a single hex                           |
 | GET    | `/api/uploads/backup.json`        | Stored snapshot, or empty `{ mil:[], gov:[], civ:[] }` |
-| POST   | `/api/uploads/backup`             | Whole-snapshot replace, body matches client export shape |
+| POST   | `/api/uploads/backup`             | Whole-snapshot replace, body matches client export shape. Rotates the old snapshot into `backup-history/` first, and returns `409` rather than emptying a section that currently has aircraft — add `"force": true` to override |
+| GET    | `/api/uploads/backup/history`     | Retained snapshots, newest first               |
 | DELETE | `/api/uploads/backup`             | Wipes the stored snapshot                      |
 | POST   | `/api/uploads/self-update`        | Pulls `index.html` from `$FUNPLANEVIEWER_UPDATE_URL` (defaults to GitHub `main`) and atomically replaces `/opt/funplaneviewer/index.html`, keeping the previous version as `index.html.bak`. No body. |
 
 No auth, assumes LAN/Tailscale-only access (matches the existing
 SkyStats backend on `:5173`).
+
+## Backup safety
+
+`POST /api/uploads/backup` replaces the stored snapshot wholesale, which
+is a sharp edge: a browser that never loaded the existing backup would
+otherwise overwrite it with empty lists. `localStorage` is per-origin, so
+that is easy to hit by opening the GUI on a Tailscale hostname when
+`/api/uploads/` is only proxied on the LAN name.
+
+Two guards:
+
+- The previous snapshot is copied to `backup-history/backup-<UTC>.json`
+  before every write. The newest 10 are kept — override with
+  `FUNPLANEVIEWER_BACKUP_HISTORY`.
+- A write that would empty a section that currently holds aircraft is
+  rejected with `409` and an explanatory message. Resend with
+  `"force": true` when clearing them is genuinely intended.
+
+To restore a rotated snapshot:
+
+```sh
+curl -s http://127.0.0.1:5174/api/uploads/backup/history
+python3 -c "
+import json,urllib.request
+snap = json.load(open('/opt/funplaneviewer/data/backup-history/backup-<UTC>.json'))
+body = json.dumps({'version':2,'force':True,'backups':snap['backups']}).encode()
+req = urllib.request.Request('http://127.0.0.1:5174/api/uploads/backup', body,
+                             {'Content-Type':'application/json'})
+print(urllib.request.urlopen(req).read().decode())
+"
+```
 
 ## Install on the Pi
 

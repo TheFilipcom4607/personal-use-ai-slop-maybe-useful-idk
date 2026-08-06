@@ -23,6 +23,7 @@ It's also optimised for mobile since that was my main priority.
 - Image fallback cards for aircraft without photos.
 - 24-hour time formatting.
 - Mobile-friendly layout with a collapsing header.
+- Warning banner when the data on screen is known to be incomplete: if a live section starts returning far fewer aircraft than it used to, or the shared backup on the Pi can't be loaded. A short list otherwise looks identical to a quiet week, which makes an upstream problem read as deleted aircraft.
 
 **Stats dashboard**
 - A Stats tab with a switch between two views: "Backend stats" (feeder-wide) and "My aircraft" (your logged interesting aircraft).
@@ -42,6 +43,7 @@ It's also optimised for mobile since that was my main priority.
 - CSV and JSON import for restoring backups.
 - Imported backups are merged into the live receiver feed instead of replacing it.
 - Imported backup data persists locally in the browser, with optional shared persistence on the Pi (see [server/README.md](server/README.md)).
+- Server-side backups are versioned before every overwrite, and a save that would wipe a section that still has aircraft is refused (see [Backup safety](server/README.md#backup-safety)).
 - Optional import enrichment from [plane-alert-db](https://github.com/sdr-enthusiasts/plane-alert-db):
   - pulls missing image links from `plane_images.csv`
   - pulls missing tags and metadata from `plane-alert-db.csv`
