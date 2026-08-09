@@ -1173,35 +1173,114 @@
     flex-wrap: wrap;
   }
 
-  .manual-image-dialog {
-    width: min(520px, 100%);
+  /* Photo links dialog. Scoped to a single aircraft, so it leads with which
+     aircraft is being edited instead of opening on a search box. */
+  .photo-dialog {
+    width: min(660px, 100%);
+    padding: 0;
   }
 
-  .manual-image-dialog label {
-    display: block;
-    margin-top: 12px;
+  .photo-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 15px 20px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    border-radius: 11px 11px 0 0;
+  }
+
+  .photo-head-thumb {
+    position: relative;
+    flex: none;
+    width: 78px;
+    height: 52px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: repeating-linear-gradient(135deg, #1e222e 0 6px, #171a23 6px 12px);
     color: var(--text-dim);
+    font-size: 0.62rem;
+  }
+  /* Absolute, not a grid item: the centred auto row leaves the percentage
+     height unresolvable, and the photo ends up sized by its own aspect ratio. */
+  .photo-head-thumb img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .photo-head-text { flex: 1; min-width: 0; }
+
+  .photo-head-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .photo-head-name {
+    font-size: 0.98rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .photo-head-title .modal-group-badge {
+    flex: none;
+    margin-left: 0;
+    padding: 2px 7px;
+    font-size: 0.62rem;
+  }
+
+  .photo-head-meta {
+    margin-top: 4px;
     font-size: 0.78rem;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .photo-head .btn { flex: none; white-space: nowrap; }
+
+  /* Aircraft picker, revealed by "Change aircraft". Hidden by default: the
+     dialog normally opens already pointed at the aircraft you triple-clicked. */
+  .photo-picker {
+    padding: 14px 20px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .photo-picker label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--text-dim);
+    font-size: 0.75rem;
     font-weight: 600;
   }
+  .photo-picker label + label,
+  .photo-picker .manual-image-search-wrap + label { margin-top: 10px; }
 
-  .manual-image-dialog input,
-  .manual-image-dialog select {
+  .photo-picker input {
     width: 100%;
-    margin-top: 6px;
     padding: 9px 10px;
-    background: var(--bg);
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
     color: var(--text);
     font-size: 0.86rem;
+    font-family: inherit;
     outline: none;
   }
+  .photo-picker input:focus { border-color: var(--accent); }
 
-  .manual-image-dialog input:focus,
-  .manual-image-dialog select:focus {
-    border-color: var(--accent);
-  }
+  .photo-body { padding: 18px 20px; }
 
   .manual-image-search-wrap {
     position: relative;
@@ -1245,44 +1324,136 @@
     cursor: default;
   }
 
-  .manual-image-links {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 8px;
-    margin-top: 6px;
+  .photo-desc {
+    color: var(--text-dim);
+    font-size: 0.82rem;
+    line-height: 1.5;
   }
+
+  .photo-lookups {
+    margin-top: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 7px;
+  }
+  .photo-lookups-label {
+    font-size: 0.76rem;
+    color: var(--text-dim);
+  }
+  .photo-lookups .btn {
+    padding: 6px 11px;
+    font-size: 0.78rem;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .photo-lookups .btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+  .photo-lookups .btn[disabled]:hover { border-color: var(--border); }
+
+  .photo-links-head {
+    margin-top: 18px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .photo-links-head label {
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .photo-links-count { font-size: 0.74rem; color: var(--text-dim); }
+
+  .photo-links {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .photo-link-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-left: 11px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+  }
+  .photo-link-row:focus-within { border-color: var(--accent); }
+
+  .photo-link-n {
+    flex: none;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .photo-link-row input {
+    flex: 1;
+    min-width: 0;
+    height: 38px;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-size: 0.84rem;
+    font-family: inherit;
+  }
+
+  .photo-link-clear {
+    flex: none;
+    width: 32px;
+    height: 38px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 1.05rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .photo-link-clear:hover { color: var(--red); }
 
   .manual-image-status {
     min-height: 1.2em;
-    margin-top: 10px;
+    margin-top: 12px;
     color: var(--text-dim);
     font-size: 0.8rem;
+    line-height: 1.45;
   }
 
   /* Collapse the status line when blank so the dialog stays compact on
      small screens (e.g. the mobile web view). */
   .manual-image-status:empty { display: none; }
 
-  /* Compact spacing on small screens so the whole manual-image menu fits
-     without internal scrolling. The intro paragraph is dropped: it's the
-     hidden power-user menu, the description is dead weight on a phone. */
-  @media (max-width: 640px) {
-    .app-dialog-overlay { padding: 10px; }
-    .app-dialog { padding: 14px; }
-    .manual-image-dialog > p { display: none; }
-    .manual-image-dialog label { margin-top: 8px; }
-    .app-dialog-actions { margin-top: 12px; }
-  }
-
-  .manual-image-actions {
-    justify-content: space-between;
-  }
-
-  .manual-image-actions .right-actions,
-  .manual-image-actions .left-actions {
+  /* Footer bar shared by the settings and photo dialogs. Both are
+     edge-to-edge panels, so their actions get a bar of their own instead of
+     the default .app-dialog-actions margin. */
+  .dialog-foot {
     display: flex;
-    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px 20px;
+    background: var(--surface2);
+    border-top: 1px solid var(--border);
+    border-radius: 0 0 11px 11px;
   }
+
+  .dialog-foot-left,
+  .dialog-foot-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .dialog-foot .btn { white-space: nowrap; }
+
+  .btn-danger { color: #e8a3a3; border-color: #3f2a2e; }
+  .btn-danger:hover { border-color: var(--red); }
 
   .app-version {
     margin-left: auto;
@@ -1292,63 +1463,323 @@
     user-select: text;
   }
 
-  /* Settings menu (hidden, opens via triple-click on the title) */
-  .settings-dialog { width: min(480px, 100%); }
+  /* Settings menu (hidden, opens via triple-click on the title). One tabbed
+     panel rather than a menu of links: every row opened a dialog of its own
+     anyway, and the footer action is what actually differs per tab. */
+  .settings-dialog {
+    width: min(720px, 100%);
+    padding: 0;
+  }
 
-  .settings-head { margin-bottom: 18px; }
-  .settings-head h2 { font-size: 1.1rem; margin: 0; }
+  .settings-topbar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 22px 14px;
+  }
+  .settings-topbar h2 { font-size: 1.05rem; margin: 0; }
   .settings-sub {
     color: var(--text-dim);
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     line-height: 1.4;
-    margin-top: 3px;
+    margin-top: 4px;
   }
 
-  .settings-list { display: flex; flex-direction: column; gap: 8px; }
-
-  .settings-row {
+  .settings-live {
+    flex: none;
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 12px 14px;
-    background: var(--surface2);
+    gap: 7px;
+    padding: 5px 11px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.74rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  .settings-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 0 22px;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .settings-tabs::-webkit-scrollbar { display: none; }
+
+  .settings-tab {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 11px 12px;
+    margin-bottom: -1px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .settings-tab:hover { color: var(--text); }
+  .settings-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+
+  .settings-tab-badge {
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--bg);
+    font-size: 0.62rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .settings-panel {
+    padding: 18px 22px;
+    min-height: 268px;
+  }
+
+  .settings-desc {
+    color: var(--text-dim);
+    font-size: 0.82rem;
+    line-height: 1.5;
+    max-width: 62ch;
+  }
+
+  .settings-field { margin-top: 16px; }
+  .settings-field label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .settings-field input {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    color: var(--text);
+    font-size: 0.85rem;
+    font-family: inherit;
+    outline: none;
+  }
+  .settings-field input:focus { border-color: var(--accent); }
+
+  /* Read-only "what's actually in effect" rows under the backend field. */
+  .settings-facts {
+    margin-top: 14px;
     border: 1px solid var(--border);
     border-radius: 11px;
-    transition: border-color 0.15s;
+    overflow: hidden;
   }
-  .settings-row:hover { border-color: var(--accent-dim); }
-  .settings-row-icon {
-    flex-shrink: 0;
-    width: 34px;
-    height: 34px;
-    display: grid;
-    place-items: center;
-    border-radius: 9px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--text-dim);
-  }
-  .settings-row:hover .settings-row-icon { color: var(--accent); }
-  .settings-row-icon svg { width: 18px; height: 18px; }
-  .settings-row-text { flex: 1; min-width: 0; }
-  .settings-row-title { font-size: 0.9rem; font-weight: 600; color: var(--text); }
-  .settings-row-desc {
-    font-size: 0.76rem;
-    color: var(--text-dim);
-    line-height: 1.4;
-    margin-top: 2px;
-  }
-  .settings-row .btn { flex-shrink: 0; }
-
-  .settings-foot {
+  .settings-fact {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    margin-top: 18px;
-    padding-top: 15px;
-    border-top: 1px solid var(--border);
+    gap: 14px;
+    padding: 10px 14px;
+    background: var(--bg);
+    font-size: 0.78rem;
   }
+  .settings-fact + .settings-fact { border-top: 1px solid var(--border); }
+  .settings-fact-key { flex: none; color: var(--text-dim); }
+  .settings-fact-val {
+    min-width: 0;
+    text-align: right;
+    word-break: break-all;
+    font-variant-numeric: tabular-nums;
+  }
+  .settings-fact-val.dim { color: var(--text-dim); }
+  .settings-fact.reach { justify-content: flex-start; gap: 9px; }
+  .settings-fact.reach .settings-fact-val { text-align: left; }
+
+  .settings-dot {
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-dim);
+  }
+  .settings-dot.ok { background: var(--green); box-shadow: 0 0 0 3px rgba(81, 197, 145, 0.15); }
+  .settings-dot.bad { background: var(--red); box-shadow: 0 0 0 3px rgba(224, 117, 117, 0.15); }
+
+  /* Daily backups (settings tab) */
+  .backups-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .backups-head .btn { flex: none; white-space: nowrap; }
+
+  .backups-list {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin-top: 16px;
+    max-height: min(40vh, 236px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .backup-row {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    padding: 10px 13px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .backup-row:hover { border-color: var(--accent-dim); }
+  .backup-row.selected { border-color: var(--accent); background: var(--surface2); }
+  .backup-row.busy { opacity: 0.55; }
+  .backup-row.empty { cursor: default; }
+  .backup-row.empty:hover { border-color: var(--border); }
+  .backup-row-text { flex: 1; min-width: 0; }
+  .backup-row-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .backup-row-desc {
+    font-size: 0.74rem;
+    color: var(--text-dim);
+    line-height: 1.4;
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .backup-row .btn { flex: none; }
+
+  .backup-tag {
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: var(--accent-dim);
+    color: var(--text);
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* Proportions of mil / gov / civ inside a snapshot, so a backup that lost a
+     whole section is visible without opening it. */
+  .backup-mix {
+    flex: none;
+    display: flex;
+    width: 84px;
+    height: 6px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--surface2);
+  }
+  .backup-mix i { display: block; height: 100%; }
+
+  .backup-legend {
+    margin-top: 13px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+  }
+  .backup-legend span { display: flex; align-items: center; gap: 6px; }
+  .backup-legend i { width: 8px; height: 8px; border-radius: 2px; }
+
+  .backups-note {
+    margin-top: 12px;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    line-height: 1.45;
+    word-break: break-word;
+  }
+  .backups-note:empty { display: none; }
+  .backups-note.error-text { color: var(--red); }
+
+  /* Update app (settings tab) */
+  .update-card {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    padding: 13px 16px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 11px;
+  }
+  .update-slot { min-width: 106px; }
+  .update-slot-key { font-size: 0.72rem; color: var(--text-dim); }
+  .update-slot-val {
+    margin-top: 4px;
+    font-size: 0.95rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .update-slot.ahead .update-slot-key,
+  .update-slot.ahead .update-slot-val { color: var(--accent); }
+  .update-arrow { color: var(--text-dim); font-size: 1.05rem; }
+  .update-commit {
+    flex: 1;
+    min-width: 110px;
+    text-align: right;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    line-height: 1.55;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .update-changes-title {
+    margin-top: 16px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-dim);
+  }
+  .update-changes {
+    margin-top: 9px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .update-change {
+    display: flex;
+    gap: 10px;
+    font-size: 0.82rem;
+    line-height: 1.45;
+  }
+  .update-change i {
+    flex: none;
+    width: 5px;
+    height: 5px;
+    margin-top: 7px;
+    border-radius: 50%;
+    background: var(--text-dim);
+  }
+
+  .update-warn {
+    margin-top: 14px;
+    padding: 10px 13px;
+    border: 1px solid rgba(226, 180, 66, 0.35);
+    background: rgba(226, 180, 66, 0.1);
+    border-radius: 10px;
+    font-size: 0.78rem;
+    color: var(--amber);
+    line-height: 1.45;
+  }
+
   .settings-foot-left { display: flex; align-items: center; gap: 14px; }
   .settings-foot-left .app-version { margin-left: 0; }
   .settings-gh {
@@ -1363,72 +1794,29 @@
   .settings-gh:hover { color: var(--text); }
   .settings-gh svg { width: 16px; height: 16px; }
 
-  /* Daily backups (restore dialog, opened from the settings menu) */
-  .backups-dialog { width: min(520px, 100%); }
+  /* Compact spacing on small screens so the settings and photo dialogs fit
+     without internal scrolling. The intro paragraphs are dropped: these are
+     hidden power-user dialogs, the descriptions are dead weight on a phone. */
+  @media (max-width: 640px) {
+    .app-dialog-overlay { padding: 10px; }
+    .app-dialog { padding: 14px; }
+    .settings-dialog, .photo-dialog { padding: 0; }
+    .app-dialog-actions { margin-top: 12px; }
 
-  .backups-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-top: 14px;
-    max-height: min(46vh, 340px);
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-  }
+    .settings-topbar { padding: 14px 14px 12px; }
+    .settings-tabs { padding: 0 10px; }
+    .settings-tab { padding: 11px 9px; }
+    .settings-panel { padding: 14px; min-height: 0; }
+    .settings-desc { display: none; }
+    .backups-list { max-height: min(38vh, 210px); }
 
-  .backup-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 12px;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-  }
-  .backup-row.busy { opacity: 0.55; }
-  .backup-row-text { flex: 1; min-width: 0; }
-  .backup-row-title { font-size: 0.88rem; font-weight: 600; color: var(--text); }
-  .backup-row-desc {
-    font-size: 0.74rem;
-    color: var(--text-dim);
-    line-height: 1.4;
-    margin-top: 2px;
-  }
-  .backup-row .btn { flex-shrink: 0; }
+    .photo-head { padding: 12px 14px; gap: 11px; }
+    .photo-head-thumb { width: 62px; height: 44px; }
+    .photo-picker, .photo-body { padding: 14px; }
+    .photo-desc { display: none; }
 
-  .backups-note {
-    margin-top: 12px;
-    font-size: 0.78rem;
-    color: var(--text-dim);
-    line-height: 1.45;
-    min-height: 1.1em;
-    word-break: break-word;
-  }
-  .backups-note.error-text { color: var(--red); }
-
-  .backups-actions { justify-content: space-between; }
-  .backups-actions .right-actions { display: flex; gap: 8px; }
-
-  .manual-image-jetphotos-row {
-    margin-top: 8px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .manual-image-jetphotos-row .btn {
-    flex: 1 1 0;
-    min-width: 0;
-    padding-left: 8px;
-    padding-right: 8px;
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .manual-image-jetphotos-row .btn[disabled] {
-    opacity: 0.5;
-    cursor: not-allowed;
+    .dialog-foot { padding: 10px 14px; }
+    .settings-gh span { display: none; }
   }
 
   .backend-input {
@@ -1618,138 +2006,177 @@
 </div>
 
 <div class="app-dialog-overlay" id="manualImageMenu" aria-hidden="true">
-  <div class="app-dialog manual-image-dialog" role="dialog" aria-modal="true" aria-labelledby="manualImageTitle">
-    <h2 id="manualImageTitle">Manual Image Links</h2>
-    <p>Add or replace photos for any aircraft. Your links override the database entry on this device or on the server.</p>
-
-    <label for="manualImagePlaneSearch">Aircraft</label>
-    <div class="manual-image-search-wrap">
-      <input type="text" id="manualImagePlaneSearch" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Type hex, registration, type, or operator…" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="manualImageSuggestions">
-      <div id="manualImageSuggestions" class="manual-image-suggestions" role="listbox" hidden></div>
+  <div class="app-dialog photo-dialog" role="dialog" aria-modal="true" aria-labelledby="photoHeadName">
+    <div class="photo-head">
+      <div class="photo-head-thumb" id="photoHeadThumb">photo</div>
+      <div class="photo-head-text">
+        <div class="photo-head-title">
+          <span class="photo-head-name" id="photoHeadName">No aircraft picked</span>
+          <span id="photoHeadBadge"></span>
+        </div>
+        <div class="photo-head-meta" id="photoHeadMeta">Pick one to edit its photo links</div>
+      </div>
+      <button class="btn" type="button" id="photoChangePlane" aria-expanded="false" aria-controls="photoPicker">Change aircraft</button>
     </div>
 
-    <label for="manualImageHex">ICAO hex</label>
-    <input type="text" id="manualImageHex" maxlength="8" autocomplete="off" placeholder="A1B2C3">
-    <div class="manual-image-jetphotos-row">
-      <button class="btn" type="button" id="manualImageJetphotos" disabled title="Open JetPhotos search for this aircraft's registration">JetPhotos reg <span id="manualImageJetphotosReg"></span></button>
-      <button class="btn" type="button" id="manualImageGoogle" disabled title="Google the ICAO hex">Google hex <span id="manualImageGoogleHex"></span></button>
-      <button class="btn" type="button" id="manualImagePlanespotters" disabled title="Open Planespotters hex lookup">Planespotters hex <span id="manualImagePlanespottersHex"></span></button>
+    <div class="photo-picker" id="photoPicker" hidden>
+      <label for="manualImagePlaneSearch">Aircraft</label>
+      <div class="manual-image-search-wrap">
+        <input type="text" id="manualImagePlaneSearch" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Type hex, registration, type, or operator…" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="manualImageSuggestions">
+        <div id="manualImageSuggestions" class="manual-image-suggestions" role="listbox" hidden></div>
+      </div>
+      <label for="manualImageHex">ICAO hex</label>
+      <input type="text" id="manualImageHex" maxlength="8" autocomplete="off" placeholder="A1B2C3">
     </div>
 
-    <label>Image links</label>
-    <div class="manual-image-links">
-      <input type="url" id="manualImageUrl1" placeholder="https://...">
-      <input type="url" id="manualImageUrl2" placeholder="https://...">
-      <input type="url" id="manualImageUrl3" placeholder="https://...">
-      <input type="url" id="manualImageUrl4" placeholder="https://...">
+    <div class="photo-body">
+      <div class="photo-desc">Photos you add here override the database entry for this aircraft, on this device or on the server.</div>
+
+      <div class="photo-lookups">
+        <span class="photo-lookups-label">Find photos:</span>
+        <button class="btn" type="button" id="manualImageJetphotos" disabled title="Open JetPhotos search for this aircraft's registration">JetPhotos reg ↗</button>
+        <button class="btn" type="button" id="manualImageGoogle" disabled title="Google the ICAO hex">Google hex ↗</button>
+        <button class="btn" type="button" id="manualImagePlanespotters" disabled title="Open Planespotters hex lookup">Planespotters ↗</button>
+      </div>
+
+      <div class="photo-links-head">
+        <label for="manualImageUrl1">Image links</label>
+        <span class="photo-links-count" id="photoLinksCount">0 of 4 used</span>
+      </div>
+      <div class="photo-links" id="photoLinks">
+        <div class="photo-link-row">
+          <span class="photo-link-n">1</span>
+          <input type="url" id="manualImageUrl1" placeholder="https://…">
+          <button class="photo-link-clear" type="button" data-clear="1" aria-label="Clear link 1">×</button>
+        </div>
+        <div class="photo-link-row">
+          <span class="photo-link-n">2</span>
+          <input type="url" id="manualImageUrl2" placeholder="https://…">
+          <button class="photo-link-clear" type="button" data-clear="2" aria-label="Clear link 2">×</button>
+        </div>
+        <div class="photo-link-row">
+          <span class="photo-link-n">3</span>
+          <input type="url" id="manualImageUrl3" placeholder="https://…">
+          <button class="photo-link-clear" type="button" data-clear="3" aria-label="Clear link 3">×</button>
+        </div>
+        <div class="photo-link-row">
+          <span class="photo-link-n">4</span>
+          <input type="url" id="manualImageUrl4" placeholder="https://…">
+          <button class="photo-link-clear" type="button" data-clear="4" aria-label="Clear link 4">×</button>
+        </div>
+      </div>
+
+      <div class="manual-image-status" id="manualImageStatus"></div>
     </div>
 
-    <div class="manual-image-status" id="manualImageStatus"></div>
-    <div class="app-dialog-actions manual-image-actions">
-      <div class="left-actions">
-        <button class="btn" type="button" id="manualImageRemove">Remove</button>
+    <div class="dialog-foot">
+      <div class="dialog-foot-left">
+        <button class="btn btn-danger" type="button" id="manualImageRemove">Remove all</button>
         <button class="btn" type="button" id="manualImagePrint" disabled title="Print a receipt for this aircraft on the thermal printer">Print</button>
       </div>
-      <div class="right-actions">
-        <button class="btn" type="button" id="manualImageClose">Close</button>
-        <button class="btn btn-active" type="button" id="manualImageSave">Save</button>
+      <div class="dialog-foot-right">
+        <button class="btn" type="button" id="manualImageClose">Cancel</button>
+        <button class="btn btn-active" type="button" id="manualImageSave">Save photos</button>
       </div>
     </div>
-
   </div>
 </div>
 
 <div class="app-dialog-overlay" id="settingsMenu" aria-hidden="true">
   <div class="app-dialog settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
-    <div class="settings-head">
-      <h2 id="settingsTitle">Settings</h2>
-      <div class="settings-sub">A better viewer for interesting aircraft logged by your ADS-B feeder.</div>
-    </div>
-
-    <div class="settings-list">
-      <div class="settings-row">
-        <span class="settings-row-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="M21 16l-4.5-4.5L6 22"/></svg>
-        </span>
-        <div class="settings-row-text">
-          <div class="settings-row-title">Aircraft photos</div>
-          <div class="settings-row-desc">Add or replace image links for any aircraft. Tip: triple-click a photo in the detail view.</div>
-        </div>
-        <button class="btn" type="button" id="settingsPhotos">Edit…</button>
+    <div class="settings-topbar">
+      <div>
+        <h2 id="settingsTitle">Settings</h2>
+        <div class="settings-sub" id="settingsSub">Fun Plane Viewer</div>
       </div>
-
-      <div class="settings-row">
-        <span class="settings-row-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.4 2.7 2.4 15.3 0 18M12 3c-2.4 2.7-2.4 15.3 0 18"/></svg>
-        </span>
-        <div class="settings-row-text">
-          <div class="settings-row-title">Backend URL</div>
-          <div class="settings-row-desc">Point the viewer at a different SkyStats feeder — for Tailscale or remote access.</div>
-        </div>
-        <button class="btn" type="button" id="settingsBackend">Change…</button>
-      </div>
-
-      <div class="settings-row">
-        <span class="settings-row-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/></svg>
-        </span>
-        <div class="settings-row-text">
-          <div class="settings-row-title">Daily backups</div>
-          <div class="settings-row-desc">Roll back to an automatic daily snapshot if the feed loses aircraft.</div>
-        </div>
-        <button class="btn" type="button" id="settingsBackups">Restore…</button>
-      </div>
-
-      <div class="settings-row">
-        <span class="settings-row-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
-        </span>
-        <div class="settings-row-text">
-          <div class="settings-row-title">Update app</div>
-          <div class="settings-row-desc">Pull the latest version from GitHub and reload. Requires the optional Pi sidecar.</div>
-        </div>
-        <button class="btn" type="button" id="settingsSelfUpdate">Update…</button>
+      <div class="settings-live">
+        <span class="settings-dot" id="settingsLiveDot"></span>
+        <span id="settingsLiveText">--</span>
       </div>
     </div>
 
-    <div class="settings-foot">
-      <div class="settings-foot-left">
+    <div class="settings-tabs" role="tablist" aria-label="Settings sections">
+      <button class="settings-tab active" type="button" role="tab" data-tab="backend" id="settingsTabBackend" aria-selected="true" aria-controls="settingsPanelBackend">Backend URL</button>
+      <button class="settings-tab" type="button" role="tab" data-tab="backups" id="settingsTabBackups" aria-selected="false" aria-controls="settingsPanelBackups">Daily backups</button>
+      <button class="settings-tab" type="button" role="tab" data-tab="update" id="settingsTabUpdate" aria-selected="false" aria-controls="settingsPanelUpdate">
+        Update app
+        <span class="settings-tab-badge" id="settingsUpdateBadge" hidden></span>
+      </button>
+    </div>
+
+    <div class="settings-panel" id="settingsPanelBackend" role="tabpanel" aria-labelledby="settingsTabBackend">
+      <div class="settings-desc">Address of the SkyStats backend. Leave blank to use the default for the hostname this page was loaded from — useful over Tailscale or from a different machine than the feeder.</div>
+
+      <div class="settings-field">
+        <label for="backendInput">Custom address</label>
+        <input type="text" id="backendInput" inputmode="url" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+      </div>
+
+      <div class="settings-facts">
+        <div class="settings-fact">
+          <span class="settings-fact-key">Currently using</span>
+          <span class="settings-fact-val" id="backendCurrent"></span>
+        </div>
+        <div class="settings-fact">
+          <span class="settings-fact-key">Default for this page</span>
+          <span class="settings-fact-val dim" id="backendDefault"></span>
+        </div>
+        <div class="settings-fact reach">
+          <span class="settings-dot" id="backendReachDot"></span>
+          <span class="settings-fact-val" id="backendReach">Checking…</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-panel" id="settingsPanelBackups" role="tabpanel" aria-labelledby="settingsTabBackups" hidden>
+      <div class="backups-head">
+        <div class="settings-desc" id="backupsSchedule">Loading…</div>
+        <button class="btn" type="button" id="backupsRunNow">Back up now</button>
+      </div>
+      <div class="backups-list" id="backupsList"></div>
+      <div class="backup-legend">
+        <span><i style="background:var(--mil)"></i>military</span>
+        <span><i style="background:var(--gov)"></i>government</span>
+        <span><i style="background:var(--civ)"></i>civilian</span>
+      </div>
+      <div class="backups-note" id="backupsNote"></div>
+    </div>
+
+    <div class="settings-panel" id="settingsPanelUpdate" role="tabpanel" aria-labelledby="settingsTabUpdate" hidden>
+      <div class="settings-desc">Replaces index.html on the server with the latest from GitHub main and reloads this page. Requires the optional Pi sidecar.</div>
+
+      <div class="update-card">
+        <div class="update-slot">
+          <div class="update-slot-key">Installed</div>
+          <div class="update-slot-val" id="updateInstalled">--</div>
+        </div>
+        <span class="update-arrow" aria-hidden="true">→</span>
+        <div class="update-slot" id="updateAvailableSlot">
+          <div class="update-slot-key">Available on main</div>
+          <div class="update-slot-val" id="updateAvailable">Checking…</div>
+        </div>
+        <div class="update-commit" id="updateCommit"></div>
+      </div>
+
+      <div class="update-changes-title">What's new</div>
+      <div class="update-changes" id="updateChanges"></div>
+
+      <div class="update-warn">Local edits to index.html on the Pi will be overwritten.</div>
+    </div>
+
+    <div class="dialog-foot">
+      <div class="dialog-foot-left settings-foot-left">
         <a class="settings-gh" href="https://github.com/TheFilipcom4607/personal-use-ai-slop-maybe-useful-idk" target="_blank" rel="noopener noreferrer" title="View this project on GitHub">
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58 0-.29-.01-1.05-.02-2.06-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.34-5.47-5.95 0-1.31.47-2.39 1.24-3.23-.13-.3-.54-1.53.11-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.65 1.65.24 2.88.12 3.18.77.84 1.23 1.92 1.23 3.23 0 4.62-2.81 5.64-5.49 5.94.43.37.82 1.1.82 2.22 0 1.6-.02 2.9-.02 3.29 0 .32.22.7.82.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z"/></svg>
           <span>GitHub</span>
         </a>
-        <span class="app-version" title="App version (bump in index.html when releasing)">v1.15.0</span>
+        <span class="app-version" id="appVersion" title="App version (bump in index.html when releasing)">v1.16.0</span>
       </div>
-      <button class="btn btn-active" type="button" id="settingsClose">Close</button>
-    </div>
-  </div>
-</div>
-
-<div class="app-dialog-overlay" id="backupsDialog" aria-hidden="true">
-  <div class="app-dialog backups-dialog" role="dialog" aria-modal="true" aria-labelledby="backupsDialogTitle">
-    <h2 id="backupsDialogTitle">Daily backups</h2>
-    <p id="backupsSchedule">Loading…</p>
-    <div class="backups-list" id="backupsList"></div>
-    <div class="backups-note" id="backupsNote"></div>
-    <div class="app-dialog-actions backups-actions">
-      <button class="btn" type="button" id="backupsRunNow">Back up now</button>
-      <div class="right-actions">
-        <button class="btn btn-active" type="button" id="backupsClose">Close</button>
+      <div class="dialog-foot-right">
+        <button class="btn" type="button" id="settingsSecondary" hidden></button>
+        <button class="btn" type="button" id="settingsClose">Close</button>
+        <button class="btn btn-active" type="button" id="settingsPrimary">Save</button>
       </div>
-    </div>
-  </div>
-</div>
-
-<div class="app-dialog-overlay" id="backendDialog" aria-hidden="true">
-  <div class="app-dialog" role="dialog" aria-modal="true" aria-labelledby="backendDialogTitle">
-    <h2 id="backendDialogTitle">SkyStats backend URL</h2>
-    <p>Address of the SkyStats backend. Leave blank to use the default for the hostname this page was loaded from. Useful when accessing the GUI over Tailscale or from a different machine than the feeder.</p>
-    <input type="text" id="backendDialogInput" class="backend-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
-    <div class="backend-hint" id="backendDialogDefault"></div>
-    <div class="app-dialog-actions">
-      <button class="btn" type="button" id="backendDialogCancel">Cancel</button>
-      <button class="btn" type="button" id="backendDialogReset">Reset to default</button>
-      <button class="btn btn-active" type="button" id="backendDialogSave">Save</button>
     </div>
   </div>
 </div>
@@ -2656,6 +3083,7 @@ function updateStats() {
   const planes = allPlanes();
   document.getElementById('countPill').textContent = `${planes.length} aircraft`;
   document.getElementById('updatedPill').textContent = `Updated ${formatTime(new Date())}`;
+  updateSettingsLive();
 }
 
 function switchSection(section) {
@@ -3057,16 +3485,18 @@ function setBackupsNote(text, isError) {
   note.classList.toggle('error-text', Boolean(isError));
 }
 
-function formatBackupDay(dateStr) {
+// Splits the day into a label and a short relative tag, so the row can show
+// "today" as a pill without repeating it inside the label.
+function backupDayParts(dateStr) {
   const day = new Date(`${dateStr}T00:00:00`);
-  if (isNaN(day.getTime())) return dateStr;
+  if (isNaN(day.getTime())) return { label: dateStr, tag: '', age: '' };
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const days = Math.round((today - day) / 86400000);
   const label = day.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
-  if (days === 0) return `${label} (today)`;
-  if (days === 1) return `${label} (yesterday)`;
-  return `${label} (${days} days ago)`;
+  if (days === 0) return { label, tag: 'today', age: '' };
+  if (days === 1) return { label, tag: 'yesterday', age: '' };
+  return { label, tag: '', age: `${days} days ago` };
 }
 
 function backupRowDesc(snapshot) {
@@ -3081,7 +3511,31 @@ function backupRowDesc(snapshot) {
     parts.push(savedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }));
   }
   if (snapshot.source && snapshot.source !== 'scheduled') parts.push(snapshot.source);
+  const age = backupDayParts(snapshot.date).age;
+  if (age) parts.push(age);
   return parts.join(' · ');
+}
+
+// Mil/gov/civ proportions as one thin bar, so a snapshot that lost a whole
+// section stands out without opening it.
+function backupMixBar(snapshot) {
+  const counts = snapshot.counts || {};
+  const segs = [
+    { n: counts.mil || 0, color: 'var(--mil)' },
+    { n: counts.gov || 0, color: 'var(--gov)' },
+    { n: counts.civ || 0, color: 'var(--civ)' }
+  ];
+  const total = segs.reduce((sum, s) => sum + s.n, 0);
+  if (!total) return '';
+  const title = `${counts.mil || 0} military, ${counts.gov || 0} government, ${counts.civ || 0} civilian`;
+  const bars = segs
+    .map(s => `<i style="width:${(s.n / total * 100).toFixed(1)}%;background:${s.color}"></i>`)
+    .join('');
+  return `<span class="backup-mix" title="${esc(title)}">${bars}</span>`;
+}
+
+function backupsPlaceholder(text) {
+  return `<div class="backup-row empty"><div class="backup-row-text"><div class="backup-row-desc">${esc(text)}</div></div></div>`;
 }
 
 function renderBackupsList(info) {
@@ -3092,52 +3546,74 @@ function renderBackupsList(info) {
   const hhmm = `${String(info.hour ?? 3).padStart(2, '0')}:${String(info.minute ?? 0).padStart(2, '0')}`;
   schedule.textContent = info.enabled === false
     ? `Automatic backups are switched off on the server. You can still take one by hand and restore any that exist.`
-    : `The Pi saves a snapshot of every logged aircraft each day at ${hhmm} and keeps the last ${info.keepDays ?? 30}. Restoring one merges it back over the live feed.`;
+    : `The Pi snapshots every logged aircraft daily at ${hhmm} and keeps the last ${info.keepDays ?? 30}. Restoring merges a snapshot back over the live feed.`;
 
   if (!snapshots.length) {
-    list.innerHTML = '<div class="backup-row"><div class="backup-row-text"><div class="backup-row-desc">No backups yet. The first one lands at the next scheduled run — or take one now.</div></div></div>';
+    list.innerHTML = backupsPlaceholder('No backups yet. The first one lands at the next scheduled run — or take one now.');
+    selectBackup('');
     return;
   }
 
-  list.innerHTML = snapshots.map(snapshot => `
-    <div class="backup-row" data-date="${esc(snapshot.date)}">
+  list.innerHTML = snapshots.map(snapshot => {
+    const parts = backupDayParts(snapshot.date);
+    return `
+    <div class="backup-row" data-date="${esc(snapshot.date)}" role="button" tabindex="0" aria-pressed="false">
       <div class="backup-row-text">
-        <div class="backup-row-title">${esc(formatBackupDay(snapshot.date))}</div>
+        <div class="backup-row-title">
+          <span>${esc(parts.label)}</span>
+          ${parts.tag ? `<span class="backup-tag">${esc(parts.tag)}</span>` : ''}
+        </div>
         <div class="backup-row-desc">${esc(backupRowDesc(snapshot))}</div>
       </div>
+      ${backupMixBar(snapshot)}
       <button class="btn" type="button" data-restore="${esc(snapshot.date)}">Restore</button>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
+
+  // Keep the previous pick if it's still listed, otherwise default to the newest.
+  const stillThere = snapshots.some(s => s.date === selectedBackupDate);
+  selectBackup(stillThere ? selectedBackupDate : snapshots[0].date);
+}
+
+// Which snapshot the footer's "Restore selected" acts on. Rows also carry their
+// own Restore button, which restores immediately without needing a selection.
+let selectedBackupDate = '';
+let backupsLoading = false;
+
+function selectBackup(date) {
+  selectedBackupDate = date || '';
+  document.querySelectorAll('#backupsList .backup-row[data-date]').forEach(row => {
+    const on = row.dataset.date === selectedBackupDate;
+    row.classList.toggle('selected', on);
+    row.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  if (settingsTab === 'backups') syncSettingsActions();
 }
 
 async function loadBackupsList() {
   const list = document.getElementById('backupsList');
-  list.innerHTML = '<div class="backup-row"><div class="backup-row-text"><div class="backup-row-desc">Loading backups…</div></div></div>';
+  list.innerHTML = backupsPlaceholder('Loading backups…');
+  // The remembered pick is held for renderBackupsList to re-apply, but nothing
+  // is selectable until the list lands — so the footer action stays out.
+  backupsLoading = true;
+  syncSettingsActions();
   try {
     renderBackupsList(await fetchJson(SNAPSHOTS_API));
   } catch (err) {
     document.getElementById('backupsSchedule').textContent =
       'Daily backups live on the Pi sidecar, which this page can’t reach right now.';
     list.innerHTML = '';
+    selectBackup('');
     setBackupsNote(`Could not list backups: ${err.message}`, true);
+  } finally {
+    backupsLoading = false;
+    syncSettingsActions();
   }
 }
 
+// Kept as a named entry point: the load error banner links straight here.
 function openBackupsDialog() {
-  const overlay = document.getElementById('backupsDialog');
-  overlay.classList.add('open');
-  overlay.setAttribute('aria-hidden', 'false');
-  setBackupsNote('');
-  if (window.matchMedia('(pointer: fine)').matches) {
-    document.getElementById('backupsClose').focus();
-  }
-  loadBackupsList();
-}
-
-function closeBackupsDialog() {
-  const overlay = document.getElementById('backupsDialog');
-  overlay.classList.remove('open');
-  overlay.setAttribute('aria-hidden', 'true');
+  openSettingsMenu('backups');
 }
 
 // Swap the whole backup overlay for a restored snapshot and repaint. The
@@ -3260,6 +3736,47 @@ function manualImageInputs() {
   return [1, 2, 3, 4].map(i => document.getElementById(`manualImageUrl${i}`));
 }
 
+// The dialog is scoped to one aircraft, so its header — not a search box — is
+// what identifies the target. Falls back to a hatched placeholder when the
+// aircraft has no usable photo yet, which is the usual reason to be in here.
+function renderPhotoHeader(hex, p) {
+  const thumb = document.getElementById('photoHeadThumb');
+  const name = document.getElementById('photoHeadName');
+  const badge = document.getElementById('photoHeadBadge');
+  const meta = document.getElementById('photoHeadMeta');
+
+  if (!hex) {
+    thumb.textContent = 'photo';
+    name.textContent = 'No aircraft picked';
+    badge.innerHTML = '';
+    meta.textContent = 'Use “Change aircraft” to pick one';
+    return;
+  }
+
+  const first = (p ? getImages(p) : getManualImageLinks(hex))[0] || '';
+  thumb.innerHTML = first
+    ? `<img src="${encodeURI(first)}" alt="" onerror="this.closest('.photo-head-thumb').textContent='photo'">`
+    : 'photo';
+
+  if (p) {
+    const grp = displayGroup(p);
+    const badgeClass = grp === 'gov' ? 'badge-gov' : grp === 'civ' ? 'badge-civ' : 'badge-mil';
+    const badgeLabel = grp === 'gov' ? 'GOV' : grp === 'civ' ? 'CIV' : 'MIL';
+    name.textContent = p.type || p.icao_type || 'Unknown type';
+    badge.innerHTML = `<span class="modal-group-badge ${badgeClass}">${badgeLabel}</span>`;
+    meta.textContent = [hex, p.registration, p.operator].filter(Boolean).join(' · ');
+  } else {
+    name.textContent = `Aircraft ${hex}`;
+    badge.innerHTML = '';
+    meta.textContent = `${hex} · not currently loaded`;
+  }
+}
+
+function updatePhotoLinkCount() {
+  const used = manualImageInputs().filter(input => input.value.trim()).length;
+  document.getElementById('photoLinksCount').textContent = `${used} of 4 used`;
+}
+
 function fillManualImageFields(hex) {
   const normalizedHex = normalizeHex(hex);
   const p = findPlane(normalizedHex);
@@ -3272,62 +3789,31 @@ function fillManualImageFields(hex) {
   document.getElementById('manualImageHex').value = normalizedHex;
   fields.forEach((field, i) => { field.value = values[i] || ''; });
   document.getElementById('manualImageRemove').disabled = !source;
+  renderPhotoHeader(normalizedHex, p);
+  updatePhotoLinkCount();
 
+  // Lookups: JetPhotos searches by registration, the other two by hex, so each
+  // is only offered when the aircraft actually carries that identifier.
   const jpBtn = document.getElementById('manualImageJetphotos');
-  const jpReg = document.getElementById('manualImageJetphotosReg');
   const reg = (p && p.registration ? String(p.registration).trim() : '');
-  if (reg) {
-    jpBtn.disabled = false;
-    jpReg.textContent = reg;
-    jpBtn.dataset.reg = reg;
-  } else {
-    jpBtn.disabled = true;
-    jpReg.textContent = '';
-    delete jpBtn.dataset.reg;
-  }
+  jpBtn.disabled = !reg;
+  if (reg) jpBtn.dataset.reg = reg; else delete jpBtn.dataset.reg;
 
-  const ggBtn = document.getElementById('manualImageGoogle');
-  const ggHex = document.getElementById('manualImageGoogleHex');
-  if (normalizedHex) {
-    ggBtn.disabled = false;
-    ggHex.textContent = normalizedHex;
-    ggBtn.dataset.hex = normalizedHex;
-  } else {
-    ggBtn.disabled = true;
-    ggHex.textContent = '';
-    delete ggBtn.dataset.hex;
-  }
-
-  const psBtn = document.getElementById('manualImagePlanespotters');
-  const psHex = document.getElementById('manualImagePlanespottersHex');
-  if (normalizedHex) {
-    psBtn.disabled = false;
-    psHex.textContent = normalizedHex;
-    psBtn.dataset.hex = normalizedHex;
-  } else {
-    psBtn.disabled = true;
-    psHex.textContent = '';
-    delete psBtn.dataset.hex;
-  }
-
-  const prBtn = document.getElementById('manualImagePrint');
-  if (normalizedHex) {
-    prBtn.disabled = false;
-    prBtn.dataset.hex = normalizedHex;
-  } else {
-    prBtn.disabled = true;
-    delete prBtn.dataset.hex;
-  }
+  ['manualImageGoogle', 'manualImagePlanespotters', 'manualImagePrint'].forEach(id => {
+    const btn = document.getElementById(id);
+    btn.disabled = !normalizedHex;
+    if (normalizedHex) btn.dataset.hex = normalizedHex; else delete btn.dataset.hex;
+  });
 
   let suffix = '';
-  if (source === 'local') suffix = ' - using local override';
-  else if (source === 'server') suffix = ' - using server entry';
-  else if (storedLinks.length) suffix = ' - database has links; saving will override them';
-  else suffix = ' - no database image links';
+  if (source === 'local') suffix = 'Using your local override.';
+  else if (source === 'server') suffix = 'Using the entry saved on the server.';
+  else if (storedLinks.length) suffix = 'Database has links; saving will override them.';
+  else suffix = 'No database image links for this aircraft.';
 
-  document.getElementById('manualImageStatus').textContent = p
-    ? `${describePlane(p)}${suffix}`
-    : normalizedHex ? 'Aircraft not currently loaded; links will still be saved.' : '';
+  document.getElementById('manualImageStatus').textContent = normalizedHex
+    ? (p ? suffix : 'Aircraft not currently loaded; links will still be saved.')
+    : '';
 }
 
 // Describes a plane as a single search-friendly line shown in the picker.
@@ -3452,6 +3938,8 @@ function pickManualImageSuggestion(value) {
   const hex = hexFromPickerValue(value);
   if (hex) fillManualImageFields(hex);
   hideManualImageSuggestions();
+  // The header now names the aircraft, so the picker has said its piece.
+  if (hex) setPhotoPickerOpen(false);
 }
 
 // Kept under the original name so all existing callers continue to work — it
@@ -3472,17 +3960,30 @@ function populateManualImageSelect(selectedHex) {
   }
 }
 
+function setPhotoPickerOpen(open) {
+  const picker = document.getElementById('photoPicker');
+  picker.hidden = !open;
+  document.getElementById('photoChangePlane').setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (!open) hideManualImageSuggestions();
+  else if (window.matchMedia('(pointer: fine)').matches) {
+    document.getElementById('manualImagePlaneSearch').focus();
+  }
+}
+
 function openManualImageMenu(hex) {
   const initialHex = normalizeHex(hex || modalHex || '');
   populateManualImageSelect(initialHex);
   fillManualImageFields(initialHex);
+  // Opened from an aircraft, the picker is noise; opened cold, it's the only
+  // way to say which aircraft you mean.
+  setPhotoPickerOpen(!initialHex);
 
   const overlay = document.getElementById('manualImageMenu');
   overlay.classList.add('open');
   overlay.setAttribute('aria-hidden', 'false');
   // Don't auto-focus on touch devices — it pops the on-screen keyboard.
-  if (window.matchMedia('(pointer: fine)').matches) {
-    document.getElementById('manualImageHex').focus();
+  if (initialHex && window.matchMedia('(pointer: fine)').matches) {
+    document.getElementById('manualImageUrl1').focus();
   }
 }
 
@@ -3493,10 +3994,70 @@ function closeManualImageMenu() {
   hideManualImageSuggestions();
 }
 
-function openSettingsMenu() {
+// --- Settings menu -----------------------------------------------------
+// One tabbed dialog. Each tab owns the footer's primary/secondary action,
+// because "Save", "Restore selected" and "Update & reload" are the only
+// things that actually differ between them.
+const SETTINGS_TABS = ['backend', 'backups', 'update'];
+const SETTINGS_ACTIONS = {
+  backend: { secondary: 'Reset to default', primary: 'Save' },
+  backups: { secondary: '',                 primary: 'Restore selected' },
+  update:  { secondary: '',                 primary: 'Update & reload' }
+};
+let settingsTab = 'backend';
+
+function backendHostLabel() {
+  try { return new URL(API_BASE).host; } catch (_) { return API_BASE; }
+}
+
+function liveAircraftTotal() {
+  return ['mil', 'gov', 'civ'].reduce((n, section) => n + data[section].length, 0);
+}
+
+function updateSettingsLive() {
+  const total = liveAircraftTotal();
+  document.getElementById('settingsLiveDot').className = `settings-dot${total ? ' ok' : ''}`;
+  document.getElementById('settingsLiveText').textContent =
+    total ? `Live · ${total} aircraft` : 'No aircraft loaded';
+}
+
+function syncSettingsActions() {
+  const actions = SETTINGS_ACTIONS[settingsTab] || SETTINGS_ACTIONS.backend;
+  const secondary = document.getElementById('settingsSecondary');
+  const primary = document.getElementById('settingsPrimary');
+  secondary.textContent = actions.secondary;
+  secondary.hidden = !actions.secondary;
+  primary.textContent = actions.primary;
+  primary.disabled = settingsTab === 'backups' && (backupsLoading || !selectedBackupDate);
+}
+
+function setSettingsTab(tab) {
+  settingsTab = SETTINGS_TABS.includes(tab) ? tab : 'backend';
+  SETTINGS_TABS.forEach(id => {
+    const on = id === settingsTab;
+    const btn = document.querySelector(`.settings-tab[data-tab="${id}"]`);
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-selected', on ? 'true' : 'false');
+    document.getElementById(`settingsPanel${id[0].toUpperCase()}${id.slice(1)}`).hidden = !on;
+  });
+  syncSettingsActions();
+
+  if (settingsTab === 'backend') renderBackendPanel();
+  else if (settingsTab === 'backups') { setBackupsNote(''); loadBackupsList(); }
+  else if (settingsTab === 'update') loadUpdateInfo();
+}
+
+function openSettingsMenu(tab) {
   const overlay = document.getElementById('settingsMenu');
+  document.getElementById('settingsSub').textContent =
+    `Fun Plane Viewer · connected to ${backendHostLabel()}`;
+  updateSettingsLive();
+  setSettingsTab(tab || settingsTab);
   overlay.classList.add('open');
   overlay.setAttribute('aria-hidden', 'false');
+  // Check GitHub once per session so the Update tab carries a badge before
+  // you go looking for it.
+  loadUpdateInfo();
   if (window.matchMedia('(pointer: fine)').matches) {
     document.getElementById('settingsClose').focus();
   }
@@ -3506,6 +4067,135 @@ function closeSettingsMenu() {
   const overlay = document.getElementById('settingsMenu');
   overlay.classList.remove('open');
   overlay.setAttribute('aria-hidden', 'true');
+}
+
+// --- Update app (settings tab) -----------------------------------------
+// The installed version is the literal in the footer; the available one is the
+// same literal read out of the index.html sitting on main — the exact file the
+// sidecar would install. Commit subjects fill the "what's new" list. Both calls
+// are best-effort: GitHub rate-limits anonymous requests and the Pi may have no
+// route off the LAN, in which case the tab still offers a blind update.
+const GITHUB_REPO = 'TheFilipcom4607/personal-use-ai-slop-maybe-useful-idk';
+const GITHUB_INDEX_URL = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/index.html`;
+const GITHUB_COMMITS_API = `https://api.github.com/repos/${GITHUB_REPO}/commits?sha=main&per_page=3`;
+const APP_VERSION = (document.getElementById('appVersion').textContent || '').trim();
+
+let updateInfo = null;      // cached for the session once a check succeeds
+let updateInfoBusy = false;
+
+function compareVersions(a, b) {
+  const pa = String(a).replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
+  const pb = String(b).replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pa[i] || 0) - (pb[i] || 0);
+    if (diff) return diff > 0 ? 1 : -1;
+  }
+  return 0;
+}
+
+async function fetchUpdateInfo() {
+  const [html, commits] = await Promise.allSettled([
+    fetch(`${GITHUB_INDEX_URL}?_=${Date.now()}`, { cache: 'no-store' })
+      .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.text(); }),
+    fetch(GITHUB_COMMITS_API, { cache: 'no-store', headers: { Accept: 'application/vnd.github+json' } })
+      .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+  ]);
+
+  const info = { version: '', sha: '', date: '', changes: [] };
+  if (html.status === 'fulfilled') {
+    const match = html.value.match(/class="app-version"[^>]*>\s*v?(\d+(?:\.\d+)*)/i);
+    if (match) info.version = `v${match[1]}`;
+  }
+  if (commits.status === 'fulfilled' && Array.isArray(commits.value) && commits.value.length) {
+    const head = commits.value[0];
+    info.sha = String(head.sha || '').slice(0, 7);
+    info.date = head.commit?.author?.date || '';
+    info.changes = commits.value
+      .map(c => String(c.commit?.message || '').split('\n')[0].trim())
+      .filter(Boolean);
+  }
+  if (!info.version && !info.sha) {
+    throw new Error(html.status === 'rejected' ? html.reason.message : 'no version found');
+  }
+  return info;
+}
+
+function setUpdateAvailable(text, ahead) {
+  document.getElementById('updateAvailable').textContent = text;
+  document.getElementById('updateAvailableSlot').classList.toggle('ahead', Boolean(ahead));
+  const badge = document.getElementById('settingsUpdateBadge');
+  badge.textContent = ahead ? text : '';
+  badge.hidden = !ahead;
+}
+
+function renderUpdateInfo(info) {
+  const ahead = Boolean(info.version) && compareVersions(info.version, APP_VERSION) > 0;
+  setUpdateAvailable(info.version || 'Unknown', ahead);
+
+  const when = info.date ? new Date(info.date) : null;
+  document.getElementById('updateCommit').innerHTML = [
+    info.sha ? `commit ${esc(info.sha)}` : '',
+    when && !isNaN(when.getTime()) ? esc(timeAgo(Math.floor(when.getTime() / 1000))) : ''
+  ].filter(Boolean).join('<br>');
+
+  const changes = ahead ? info.changes : [];
+  document.getElementById('updateChanges').innerHTML = (changes.length
+    ? changes
+    : [ahead ? 'No commit messages available.' : 'You already have what is on main.']
+  ).map(line => `<div class="update-change"><i></i><span>${esc(line)}</span></div>`).join('');
+}
+
+async function loadUpdateInfo() {
+  document.getElementById('updateInstalled').textContent = APP_VERSION || 'unknown';
+  if (updateInfo) { renderUpdateInfo(updateInfo); return; }
+  if (updateInfoBusy) return;
+
+  updateInfoBusy = true;
+  setUpdateAvailable('Checking…', false);
+  document.getElementById('updateCommit').textContent = '';
+  document.getElementById('updateChanges').innerHTML = '';
+  try {
+    updateInfo = await fetchUpdateInfo();
+    renderUpdateInfo(updateInfo);
+  } catch (err) {
+    setUpdateAvailable('Unknown', false);
+    document.getElementById('updateCommit').textContent = `Couldn’t reach GitHub (${err.message})`;
+    document.getElementById('updateChanges').innerHTML =
+      '<div class="update-change"><i></i><span>Updating anyway pulls whatever is on main right now.</span></div>';
+  } finally {
+    updateInfoBusy = false;
+  }
+}
+
+async function runSelfUpdate() {
+  const target = updateInfo && updateInfo.version ? ` (${updateInfo.version})` : '';
+  const ok = await appConfirm(
+    'Update from GitHub',
+    `Replace index.html on the server with the latest from GitHub main${target} and reload this page?`,
+    'Update', 'Cancel');
+  if (!ok) return;
+
+  // On success the page reloads anyway, so the dialog goes with it.
+  closeSettingsMenu();
+  try {
+    const res = await fetch(`${UPLOADS_API_BASE}/self-update`, {
+      method: 'POST',
+      cache: 'no-store',
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    // Cache-bust the reload. Browsers often hand back the cached HTML
+    // on a plain reload, hiding the just-replaced index.html. Append
+    // the sha256 of what the sidecar wrote so the URL also changes
+    // when the content does, and clear any existing buster first so
+    // we don't accumulate stale ones.
+    const url = new URL(location.href);
+    url.searchParams.delete('u');
+    url.searchParams.set('v', (data.sha256 || Date.now().toString(36)).slice(0, 12));
+    location.replace(url.toString());
+  } catch (err) {
+    appAlert('Update failed', String(err && err.message || err));
+  }
 }
 
 function isValidImageUrl(url) {
@@ -4329,38 +5019,33 @@ function closeModal(e) {
   }
 }
 
+// Escape closes the topmost dialog. Confirm / choose / printer are the ones
+// stacked above everything else (see the z-index rule), so they get first
+// refusal: a restore confirmation sitting over the settings dialog must cancel
+// itself rather than close the list behind it.
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && document.getElementById('printerDialog').classList.contains('open')) {
+  if (e.key !== 'Escape') return;
+  if (document.getElementById('printerDialog').classList.contains('open')) {
     closePrinterDialog();
     return;
   }
-  if (e.key === 'Escape' && document.getElementById('manualImageMenu').classList.contains('open')) {
-    closeManualImageMenu();
-    return;
-  }
-  if (e.key === 'Escape' && document.getElementById('settingsMenu').classList.contains('open')) {
-    closeSettingsMenu();
-    return;
-  }
-  if (e.key === 'Escape' && document.getElementById('appChooseDialog').classList.contains('open')) {
+  if (document.getElementById('appChooseDialog').classList.contains('open')) {
     closeAppChoose(null);
     return;
   }
-  if (e.key === 'Escape' && document.getElementById('backendDialog').classList.contains('open')) {
-    closeBackendDialog();
-    return;
-  }
-  if (e.key === 'Escape' && appDialogResolve && appDialogCanCancel) {
+  if (appDialogResolve && appDialogCanCancel) {
     closeAppDialog(false);
     return;
   }
-  // After the confirm above: a restore confirmation sits on top of this dialog,
-  // so the first Escape should cancel that, not close the list behind it.
-  if (e.key === 'Escape' && document.getElementById('backupsDialog').classList.contains('open')) {
-    closeBackupsDialog();
+  if (document.getElementById('manualImageMenu').classList.contains('open')) {
+    closeManualImageMenu();
     return;
   }
-  if (e.key === 'Escape' && document.getElementById('modal').classList.contains('open')) {
+  if (document.getElementById('settingsMenu').classList.contains('open')) {
+    closeSettingsMenu();
+    return;
+  }
+  if (document.getElementById('modal').classList.contains('open')) {
     closeModal();
   }
 });
@@ -4502,23 +5187,50 @@ document.getElementById('appChooseDialog').addEventListener('click', (e) => {
   if (e.target.id === 'appChooseDialog') closeAppChoose(null);
 });
 
-// Backend URL dialog
+// --- Backend URL (settings tab) ---
+// Kept as a named entry point: the load error banner links straight here.
 function openBackendDialog() {
-  const overlay = document.getElementById('backendDialog');
-  const input = document.getElementById('backendDialogInput');
-  const hint = document.getElementById('backendDialogDefault');
-  input.value = loadStoredApiBase() || '';
-  input.placeholder = defaultApiBase();
-  hint.textContent = `Default for this page: ${defaultApiBase()} • Currently using: ${API_BASE}`;
-  overlay.classList.add('open');
-  overlay.setAttribute('aria-hidden', 'false');
-  setTimeout(() => input.focus(), 0);
+  openSettingsMenu('backend');
 }
 
-function closeBackendDialog() {
-  const overlay = document.getElementById('backendDialog');
-  overlay.classList.remove('open');
-  overlay.setAttribute('aria-hidden', 'true');
+function renderBackendPanel() {
+  const input = document.getElementById('backendInput');
+  input.value = loadStoredApiBase() || '';
+  input.placeholder = defaultApiBase();
+  document.getElementById('backendCurrent').textContent = API_BASE;
+  document.getElementById('backendDefault').textContent = defaultApiBase();
+  probeBackend();
+}
+
+// Round-trip probe against the feed we'd be reading anyway, so the panel can
+// say whether the address in effect actually answers — the whole reason to be
+// on this tab is that something isn't loading.
+let backendProbeToken = 0;
+async function probeBackend() {
+  const token = ++backendProbeToken;
+  const dot = document.getElementById('backendReachDot');
+  const text = document.getElementById('backendReach');
+  dot.className = 'settings-dot';
+  text.textContent = 'Checking…';
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+  const started = performance.now();
+  try {
+    const res = await fetch(`${API.mil}?_=${Date.now()}`, { cache: 'no-store', signal: controller.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (token !== backendProbeToken) return;
+    dot.className = 'settings-dot ok';
+    text.textContent = `Reachable · ${Math.round(performance.now() - started)} ms round trip`;
+  } catch (err) {
+    if (token !== backendProbeToken) return;
+    dot.className = 'settings-dot bad';
+    text.textContent = err.name === 'AbortError'
+      ? 'No answer · timed out'
+      : `Not reachable · ${err.message}`;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function applyBackendBase(newBase) {
@@ -4528,23 +5240,27 @@ function applyBackendBase(newBase) {
   else fetchAll(true);
 }
 
-document.getElementById('backendDialogCancel').addEventListener('click', closeBackendDialog);
-document.getElementById('backendDialogReset').addEventListener('click', () => {
-  storeApiBase('');
-  closeBackendDialog();
-  applyBackendBase(defaultApiBase());
-});
-document.getElementById('backendDialogSave').addEventListener('click', () => {
-  const normalized = normalizeApiBase(document.getElementById('backendDialogInput').value);
+// Both of these leave the dialog open: the facts card below the field is the
+// point, and it only tells you anything after the change has been applied.
+function saveBackendFromSettings() {
+  const normalized = normalizeApiBase(document.getElementById('backendInput').value);
   storeApiBase(normalized);
-  closeBackendDialog();
   applyBackendBase(normalized || defaultApiBase());
-});
-document.getElementById('backendDialog').addEventListener('click', (e) => {
-  if (e.target.id === 'backendDialog') closeBackendDialog();
-});
-document.getElementById('backendDialogInput').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('backendDialogSave').click(); }
+  document.getElementById('settingsSub').textContent =
+    `Fun Plane Viewer · connected to ${backendHostLabel()}`;
+  renderBackendPanel();
+}
+
+function resetBackendFromSettings() {
+  storeApiBase('');
+  applyBackendBase(defaultApiBase());
+  document.getElementById('settingsSub').textContent =
+    `Fun Plane Viewer · connected to ${backendHostLabel()}`;
+  renderBackendPanel();
+}
+
+document.getElementById('backendInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); saveBackendFromSettings(); }
 });
 
 // Thermal printer receipts (secret menu -> Print). Talks to the CircuitPython
@@ -5000,61 +5716,48 @@ document.getElementById('manualImageRemove').addEventListener('click', removeMan
 document.getElementById('manualImageMenu').addEventListener('click', (e) => {
   if (e.target.id === 'manualImageMenu') closeManualImageMenu();
 });
+document.getElementById('photoChangePlane').addEventListener('click', () => {
+  setPhotoPickerOpen(document.getElementById('photoPicker').hidden);
+});
+document.getElementById('photoLinks').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-clear]');
+  if (!btn) return;
+  document.getElementById(`manualImageUrl${btn.dataset.clear}`).value = '';
+  updatePhotoLinkCount();
+});
+document.getElementById('photoLinks').addEventListener('input', updatePhotoLinkCount);
 
 // --- Settings menu (triple-click the title) ---
 document.getElementById('settingsMenu').addEventListener('click', (e) => {
   if (e.target.id === 'settingsMenu') closeSettingsMenu();
 });
 document.getElementById('settingsClose').addEventListener('click', closeSettingsMenu);
-document.getElementById('settingsPhotos').addEventListener('click', () => {
-  closeSettingsMenu();
-  openManualImageMenu();
+document.querySelectorAll('.settings-tab').forEach(tab => {
+  tab.addEventListener('click', () => setSettingsTab(tab.dataset.tab));
 });
-document.getElementById('settingsBackend').addEventListener('click', () => {
-  closeSettingsMenu();
-  openBackendDialog();
+document.getElementById('settingsSecondary').addEventListener('click', () => {
+  if (settingsTab === 'backend') resetBackendFromSettings();
 });
-document.getElementById('settingsBackups').addEventListener('click', () => {
-  closeSettingsMenu();
-  openBackupsDialog();
+document.getElementById('settingsPrimary').addEventListener('click', () => {
+  if (settingsTab === 'backend') saveBackendFromSettings();
+  else if (settingsTab === 'backups') { if (selectedBackupDate) restoreBackup(selectedBackupDate); }
+  else if (settingsTab === 'update') runSelfUpdate();
 });
-document.getElementById('settingsSelfUpdate').addEventListener('click', async () => {
-  // Close the settings menu first; on success the page reloads anyway.
-  closeSettingsMenu();
-  const ok = await appConfirm(
-    'Update from GitHub',
-    'Replace index.html on the server with the latest from GitHub main and reload this page?',
-    'Update', 'Cancel');
-  if (!ok) return;
-  try {
-    const res = await fetch(`${UPLOADS_API_BASE}/self-update`, {
-      method: 'POST',
-      cache: 'no-store',
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
-    // Cache-bust the reload. Browsers often hand back the cached HTML
-    // on a plain reload, hiding the just-replaced index.html. Append
-    // the sha256 of what the sidecar wrote so the URL also changes
-    // when the content does, and clear any existing buster first so
-    // we don't accumulate stale ones.
-    const url = new URL(location.href);
-    url.searchParams.delete('u');
-    url.searchParams.set('v', (data.sha256 || Date.now().toString(36)).slice(0, 12));
-    location.replace(url.toString());
-  } catch (err) {
-    appAlert('Update failed', String(err && err.message || err));
-  }
-});
-// --- Daily backups dialog ---
-document.getElementById('backupsDialog').addEventListener('click', (e) => {
-  if (e.target.id === 'backupsDialog') closeBackupsDialog();
-});
-document.getElementById('backupsClose').addEventListener('click', closeBackupsDialog);
+
+// --- Daily backups (settings tab) ---
 document.getElementById('backupsRunNow').addEventListener('click', runBackupNow);
 document.getElementById('backupsList').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-restore]');
-  if (btn) restoreBackup(btn.dataset.restore);
+  if (btn) { restoreBackup(btn.dataset.restore); return; }
+  const row = e.target.closest('.backup-row[data-date]');
+  if (row) selectBackup(row.dataset.date);
+});
+document.getElementById('backupsList').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const row = e.target.closest('.backup-row[data-date]');
+  if (!row) return;
+  e.preventDefault();
+  selectBackup(row.dataset.date);
 });
 
 document.getElementById('manualImageJetphotos').addEventListener('click', (e) => {

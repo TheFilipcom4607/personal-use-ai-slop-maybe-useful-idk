@@ -52,16 +52,23 @@ It's also optimised for mobile since that was my main priority.
 **Daily backups**
 - The Pi sidecar snapshots every logged aircraft once a day at a fixed hour and keeps the last 30 days.
 - Runs on the server, so it happens whether or not anyone has the GUI open. A Pi that was off at the scheduled hour takes its backup when it boots.
-- *Daily backups* in the hidden menu lists what's stored and restores any of them in one click, plus a *Back up now* button.
+- The *Daily backups* tab in the hidden menu lists what's stored and restores any of them in one click, plus a *Back up now* button. Each row carries a bar showing the military / government / civilian split, so a snapshot that lost a whole section is obvious without opening it.
 - Restoring merges the snapshot back over the live feed, so aircraft the feeder still reports stay current and anything missing comes back.
 - Requires the Flask sidecar (see [server/README.md](server/README.md)).
 
-**Hidden menu (triple-click the title)**
+**Settings (triple-click the title)**
+
+App-wide preferences only, as three tabs:
+- *Backend URL* — optional Tailscale-friendly override for accessing the GUI from outside the local network, with the address actually in effect and a live round-trip check below the field.
+- *Daily backups* — browse and restore the automatic daily backups stored on the Pi.
+- *Update app* — the installed version against whatever is on GitHub `main`, the recent commit subjects, and an "Update & reload" button that pulls the latest `index.html` so you don't need to ssh in to deploy a change (requires the Flask sidecar, see [server/README.md](server/README.md)). The version check is best-effort: without a route to GitHub the tab still offers a blind update.
+
+**Photo links (triple-click an aircraft photo)**
+
+Scoped to one aircraft, so there's no search step to get through first:
 - Add manual per-aircraft image links, saved either locally or on the Pi for everyone.
 - One-click JetPhotos lookup by registration, plus Google and Planespotters lookups by ICAO hex.
-- Browse and restore the automatic daily backups stored on the Pi.
-- Optional Tailscale-friendly backend URL override for accessing the GUI from outside the local network.
-- Optional "Update from GitHub" button that pulls the latest `index.html` from `main` and reloads, so you don't need to ssh in to deploy a change (requires the Flask sidecar, see [server/README.md](server/README.md)).
+- *Change aircraft* opens the picker if you want to edit a different one without leaving the dialog.
 
 ## Setup
 
@@ -94,14 +101,14 @@ The SkyStats backend defaults to returning only 5 planes, so you need to raise t
 
 By default the GUI talks to the SkyStats backend at the same hostname the page was loaded from, on port `5173`. If you open the GUI via your feeder's Tailscale hostname or tailnet IP, the API calls automatically go over Tailscale too, as long as port `5173` is reachable on that host.
 
-If your setup needs a different backend address (for example, the GUI is hosted on a different machine than the feeder, or you're proxying SkyStats through Tailscale Serve), open the hidden menu (triple-click the title), click *Change backend URL…* at the bottom, and enter the full URL, for example:
+If your setup needs a different backend address (for example, the GUI is hosted on a different machine than the feeder, or you're proxying SkyStats through Tailscale Serve), open the hidden menu (triple-click the title), stay on the *Backend URL* tab, and enter the full URL, for example:
 
 - `http://my-feeder.tailnet-name.ts.net:5173`
 - `https://feeder.tailnet-name.ts.net`
 
-The value is stored in your browser's local storage and used for all subsequent requests. Click *Reset to default* to go back to the automatic behavior.
+The value is stored in your browser's local storage and used for all subsequent requests. Click *Reset to default* to go back to the automatic behavior. Both buttons leave the dialog open so the reachability line underneath can tell you whether the new address actually answers.
 
-If the GUI loads but the aircraft list doesn't, the error message includes a *Change backend URL* button that opens the same dialog.
+If the GUI loads but the aircraft list doesn't, the error message includes a *Change backend URL* button that opens the same tab.
 
 > Note: if you access the GUI over HTTPS (for example via Tailscale Serve with TLS), the backend URL also needs to be HTTPS. Browsers block mixed HTTP/HTTPS requests.
 
