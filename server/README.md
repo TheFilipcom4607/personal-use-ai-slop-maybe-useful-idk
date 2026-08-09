@@ -199,10 +199,20 @@ A single global lock serializes writes, which is fine at this traffic level.
   `FUNPLANEVIEWER_BACKUP_ENABLED=0` to stop the automatic run while
   keeping the endpoints.
 - Feeder address for backups: `FUNPLANEVIEWER_SKYSTATS_URL` (default
-  `http://adsb-feeder.local:5173`). If the sidecar can't reach it, the
-  GUI's *Back up now* button falls back to uploading what the browser
-  has — but then backups only happen while a browser is open, so it's
-  worth getting this right.
+  `http://127.0.0.1:5173`, i.e. SkyStats on this same host — the usual
+  setup). Point it at the feeder's IP if it's a separate box. Prefer an
+  IP over a `.local` name: systemd services often can't resolve mDNS
+  even when your browser can, and the failure looks like a plain 502.
+  Check with:
+
+  ```sh
+  curl -fsS -o /dev/null -w '%{http_code}\n' \
+    "$(grep -oP 'SKYSTATS_URL=\K\S+' /etc/systemd/system/funplaneviewer-uploads.service)/api/stats/interesting/military"
+  ```
+
+  If the sidecar can't reach it, the GUI's *Back up now* button falls
+  back to uploading what the browser has — but then backups only happen
+  while a browser is open, so it's worth getting this right.
 - Different self-update source: set `FUNPLANEVIEWER_UPDATE_URL=` (raw URL
   to an `index.html`) or `FUNPLANEVIEWER_INDEX_HTML=` (target path) in
   the unit.

@@ -49,10 +49,15 @@ PORT = int(os.environ.get("PORT", "5174"))
 HOST = os.environ.get("HOST", "127.0.0.1")
 
 # Daily backups. The sidecar pulls the aircraft lists straight from SkyStats
-# so a snapshot happens whether or not anyone has the GUI open. SkyStats may
-# live on a different host than the GUI, hence its own URL.
+# so a snapshot happens whether or not anyone has the GUI open.
+#
+# Defaults to this host: the GUI already assumes SkyStats answers on the
+# hostname the page was served from, and this sidecar runs on that host, so
+# localhost is the same assumption with no name resolution in the way. A Pi
+# can't necessarily resolve its own .local name, which makes an mDNS default
+# actively worse. Point the env var elsewhere for a split setup.
 SKYSTATS_URL = os.environ.get(
-    "FUNPLANEVIEWER_SKYSTATS_URL", "http://adsb-feeder.local:5173").rstrip("/")
+    "FUNPLANEVIEWER_SKYSTATS_URL", "http://127.0.0.1:5173").rstrip("/")
 SKYSTATS_TIMEOUT = int(os.environ.get("FUNPLANEVIEWER_SKYSTATS_TIMEOUT", "30"))
 BACKUP_ENABLED = os.environ.get(
     "FUNPLANEVIEWER_BACKUP_ENABLED", "1").strip().lower() not in ("0", "false", "no", "off")

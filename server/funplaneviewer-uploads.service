@@ -16,9 +16,11 @@ Environment=HOST=127.0.0.1
 Environment=PORT=5174
 WorkingDirectory=/opt/funplaneviewer/server
 
-# Daily backups. The sidecar pulls the aircraft lists from SkyStats itself, so
-# point it at the feeder — this is NOT necessarily the host serving the GUI.
-Environment=FUNPLANEVIEWER_SKYSTATS_URL=http://adsb-feeder.local:5173
+# Daily backups. The sidecar pulls the aircraft lists from SkyStats itself.
+# Leave as localhost when SkyStats runs on this same host (the usual setup);
+# use the feeder's IP if it's a separate box. Avoid .local names here — the
+# service may not be able to resolve mDNS even when your browser can.
+Environment=FUNPLANEVIEWER_SKYSTATS_URL=http://127.0.0.1:5173
 Environment=FUNPLANEVIEWER_BACKUP_HOUR=3
 Environment=FUNPLANEVIEWER_BACKUP_KEEP_DAYS=30
 # Set to 0 to keep the endpoints but stop the automatic daily run.
