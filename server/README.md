@@ -9,6 +9,9 @@ shared, server-side data:
 - `backup.json`: the same shape the GUI's `Import` button produces.
 - `backup-history/`: the previous `backup.json` on every write, kept so a
   bad save can be undone (see [Backup safety](#backup-safety)).
+- `snapshots/`: one automatic backup per day, taken by a background
+  thread whether or not anyone has the GUI open. Restore one from
+  *Daily backups* in the hidden menu (see [Daily backups](#daily-backups)).
 
 It's a sidecar because the existing nginx-served static site can't
 accept POSTs. nginx fronts the sidecar at `/api/uploads/` so the GUI
@@ -27,6 +30,12 @@ just talks to the page's own origin.
 | GET    | `/api/uploads/backup/history`     | Retained snapshots, newest first               |
 | DELETE | `/api/uploads/backup`             | Wipes the stored snapshot                      |
 | POST   | `/api/uploads/self-update`        | Pulls `index.html` from `$FUNPLANEVIEWER_UPDATE_URL` (defaults to GitHub `main`) and atomically replaces `/opt/funplaneviewer/index.html`, keeping the previous version as `index.html.bak`. No body. |
+| GET    | `/api/uploads/snapshots`          | Daily-backup listing plus the schedule: `{ enabled, hour, minute, keepDays, skystats, today, snapshots: [{ date, savedAt, source, counts, total, bytes }] }` |
+| GET    | `/api/uploads/snapshots/<date>`   | One snapshot in full, `YYYY-MM-DD`, decompressed |
+| POST   | `/api/uploads/snapshots/run`      | Take a snapshot now (what the daily job does). `502` if SkyStats can't be read. No body. |
+| POST   | `/api/uploads/snapshots`          | Store a snapshot the browser assembled: `{ backups: { mil, gov, civ }, source? }`. Fallback for when the GUI can reach SkyStats but the sidecar can't. |
+| POST   | `/api/uploads/snapshots/<date>/restore` | Copy that snapshot's aircraft back into `backup.json`. No body. |
+| DELETE | `/api/uploads/snapshots/<date>`   | Remove one day's snapshot                      |
 
 No auth, assumes LAN/Tailscale-only access (matches the existing
 SkyStats backend on `:5173`).
@@ -60,6 +69,67 @@ req = urllib.request.Request('http://127.0.0.1:5174/api/uploads/backup', body,
                              {'Content-Type':'application/json'})
 print(urllib.request.urlopen(req).read().decode())
 "
+```
+
+Restoring a daily backup from the GUI goes through the same rotation, so
+picking the wrong day is undoable the same way. It deliberately skips the
+refuse-to-empty guard — replacing the overlay is the point, and the day
+was chosen by hand.
+
+## Daily backups
+
+A background thread wakes up every 15 minutes and asks one question: has
+today's snapshot been written yet, and is it past `$FUNPLANEVIEWER_BACKUP_HOUR`?
+If so it pulls the three interesting-aircraft lists from
+`$FUNPLANEVIEWER_SKYSTATS_URL`, merges `backup.json` on top (so imported
+history isn't lost), writes `snapshots/YYYY-MM-DD.json.gz`, and deletes
+anything older than `$FUNPLANEVIEWER_BACKUP_KEEP_DAYS`.
+
+Phrasing it as "today has no file yet" rather than "it is now 03:00"
+means a Pi that was powered off at 03:00 still gets its daily backup
+when it boots, and a run that failed because the feeder was down retries
+on the next tick instead of being skipped for the day.
+
+The snapshot is gzipped JSON — a few hundred KB for a few thousand
+aircraft, so 30 days costs single-digit MB:
+
+```json
+{
+  "version": 1,
+  "date": "2026-08-09",
+  "savedAt": "2026-08-09T03:00:07+02:00",
+  "source": "scheduled",
+  "counts": { "mil": 812, "gov": 143, "civ": 96 },
+  "total": 1051,
+  "backups": { "mil": [ ... ], "gov": [ ... ], "civ": [ ... ] },
+  "images": { "A1B2C3": { "registration": "...", "links": [ ... ] } }
+}
+```
+
+Manual image links ride along in `images` so a snapshot is a complete
+picture of the sidecar's data, but restoring from the GUI only puts the
+aircraft back. To also roll `images.csv` back, replay the rows from a
+snapshot by hand:
+
+```sh
+python3 - <<'PY'
+import gzip, json, urllib.request
+snap = json.load(gzip.open("/opt/funplaneviewer/data/snapshots/2026-08-09.json.gz"))
+for hex_val, row in snap.get("images", {}).items():
+    body = json.dumps({"hex": hex_val, "registration": row.get("registration", ""),
+                       "links": row.get("links", [])}).encode()
+    req = urllib.request.Request("http://127.0.0.1:5174/api/uploads/images", data=body,
+                                 headers={"Content-Type": "application/json"})
+    urllib.request.urlopen(req).read()
+PY
+```
+
+Check on it from the command line:
+
+```sh
+curl -fsS http://127.0.0.1:5174/api/uploads/snapshots | python3 -m json.tool
+curl -fsS -X POST http://127.0.0.1:5174/api/uploads/snapshots/run   # force one now
+journalctl -u funplaneviewer-uploads -g snapshot --no-pager         # what the job did
 ```
 
 ## Install on the Pi
@@ -102,10 +172,14 @@ curl -fsS http://thef-pi4/api/uploads/health
 ```
 /opt/funplaneviewer/data/
 ├── images.csv      # plane-alert-db schema
-└── backup.json     # GUI snapshot
+├── backup.json     # GUI snapshot
+└── snapshots/      # automatic daily backups, newest 30 kept
+    ├── 2026-08-09.json.gz    # full snapshot, gzipped
+    ├── 2026-08-09.meta.json  # header only, so listing stays cheap
+    └── ...
 ```
 
-Both files are written atomically (write to `*.tmp`, then `rename`).
+Everything is written atomically (write to `*.tmp`, then `rename`).
 A single global lock serializes writes, which is fine at this traffic level.
 
 ## Tweaks
@@ -113,6 +187,16 @@ A single global lock serializes writes, which is fine at this traffic level.
 - Different storage dir: set `FUNPLANEVIEWER_DATA_DIR` in the unit's
   `Environment=` and update `ReadWritePaths=`.
 - Different port: set `PORT=` in the unit and update the nginx snippet.
+- Backup schedule: `FUNPLANEVIEWER_BACKUP_HOUR` (default `3`),
+  `FUNPLANEVIEWER_BACKUP_MINUTE` (default `0`),
+  `FUNPLANEVIEWER_BACKUP_KEEP_DAYS` (default `30`),
+  `FUNPLANEVIEWER_BACKUP_ENABLED=0` to stop the automatic run while
+  keeping the endpoints.
+- Feeder address for backups: `FUNPLANEVIEWER_SKYSTATS_URL` (default
+  `http://adsb-feeder.local:5173`). If the sidecar can't reach it, the
+  GUI's *Back up now* button falls back to uploading what the browser
+  has — but then backups only happen while a browser is open, so it's
+  worth getting this right.
 - Different self-update source: set `FUNPLANEVIEWER_UPDATE_URL=` (raw URL
   to an `index.html`) or `FUNPLANEVIEWER_INDEX_HTML=` (target path) in
   the unit.

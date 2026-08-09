@@ -49,9 +49,17 @@ It's also optimised for mobile since that was my main priority.
   - pulls missing tags and metadata from `plane-alert-db.csv`
 - In-app import prompts instead of browser popups.
 
+**Daily backups**
+- The Pi sidecar snapshots every logged aircraft once a day at a fixed hour and keeps the last 30 days.
+- Runs on the server, so it happens whether or not anyone has the GUI open. A Pi that was off at the scheduled hour takes its backup when it boots.
+- *Daily backups* in the hidden menu lists what's stored and restores any of them in one click, plus a *Back up now* button.
+- Restoring merges the snapshot back over the live feed, so aircraft the feeder still reports stay current and anything missing comes back.
+- Requires the Flask sidecar (see [server/README.md](server/README.md)).
+
 **Hidden menu (triple-click the title)**
 - Add manual per-aircraft image links, saved either locally or on the Pi for everyone.
 - One-click JetPhotos lookup by registration, plus Google and Planespotters lookups by ICAO hex.
+- Browse and restore the automatic daily backups stored on the Pi.
 - Optional Tailscale-friendly backend URL override for accessing the GUI from outside the local network.
 - Optional "Update from GitHub" button that pulls the latest `index.html` from `main` and reloads, so you don't need to ssh in to deploy a change (requires the Flask sidecar, see [server/README.md](server/README.md)).
 
@@ -99,6 +107,6 @@ If the GUI loads but the aircraft list doesn't, the error message includes a *Ch
 
 ## Optional Flask sidecar
 
-A small Flask sidecar adds shared server-side persistence for manual image links and imported backups, plus a self-update button in the hidden menu that pulls the latest `index.html` from GitHub. It's strictly optional; without it the GUI works exactly as before.
+A small Flask sidecar adds shared server-side persistence for manual image links and imported backups, the automatic daily backups described above, plus a self-update button in the hidden menu that pulls the latest `index.html` from GitHub. It's strictly optional; without it the GUI works exactly as before, minus the daily backups.
 
 See [server/README.md](server/README.md) for setup.

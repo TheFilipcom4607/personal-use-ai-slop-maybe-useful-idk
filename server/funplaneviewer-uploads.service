@@ -16,6 +16,14 @@ Environment=HOST=127.0.0.1
 Environment=PORT=5174
 WorkingDirectory=/opt/funplaneviewer/server
 
+# Daily backups. The sidecar pulls the aircraft lists from SkyStats itself, so
+# point it at the feeder — this is NOT necessarily the host serving the GUI.
+Environment=FUNPLANEVIEWER_SKYSTATS_URL=http://adsb-feeder.local:5173
+Environment=FUNPLANEVIEWER_BACKUP_HOUR=3
+Environment=FUNPLANEVIEWER_BACKUP_KEEP_DAYS=30
+# Set to 0 to keep the endpoints but stop the automatic daily run.
+Environment=FUNPLANEVIEWER_BACKUP_ENABLED=1
+
 # python3 with Flask installed system-wide, in a venv, or via pipx.
 # If you use a venv, point this at /opt/funplaneviewer/venv/bin/python.
 ExecStart=/usr/bin/python3 /opt/funplaneviewer/server/funplaneviewer_uploads.py

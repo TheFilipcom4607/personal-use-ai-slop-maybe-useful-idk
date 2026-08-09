@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Dassault Rafale silhouette">
+  <rect width="256" height="256" rx="52" fill="#0d0f14"/>
+  <!-- top-down Rafale: ogive nose, close-coupled canards, delta wing, twin nozzles -->
+  <path fill="#5c90e1" transform="translate(0,11)" d="M128 16
+    C131 26 134 34 135 46
+    L137 78
+    L164 95
+    Q167 96.5 167 99
+    L141 104
+    L143 114
+    L204 184
+    Q206 185.5 206 188
+    L205 193
+    L149 201
+    L147 205
+    Q147 218 137 218
+    Q128 218 128 207
+    Q128 218 119 218
+    Q109 218 109 205
+    L107 201
+    L51 193
+    L50 188
+    Q50 185.5 52 184
+    L113 114
+    L115 104
+    L89 99
+    Q89 96.5 92 95
+    L119 78
+    L121 46
+    C122 34 125 26 128 16
+    Z"/>
+</svg>
