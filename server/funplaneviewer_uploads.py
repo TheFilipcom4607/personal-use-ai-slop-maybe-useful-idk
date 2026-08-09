@@ -66,6 +66,11 @@ SCHEDULER_TICK_SECONDS = 900
 
 SECTIONS = ("mil", "gov", "civ")
 SKYSTATS_PATHS = {"mil": "military", "gov": "government", "civ": "civilian"}
+# SkyStats has a fourth interesting-aircraft feed. The GUI gives police no tab
+# of its own and folds it into Government, so a snapshot has to do the same —
+# otherwise every backup quietly omits them and restoring one deletes them.
+POLICE_PATH = "police"
+POLICE_SECTION = "gov"
 SNAPSHOT_SUFFIX = ".json.gz"
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 # Fields the GUI treats as "live wins unless empty" — mirrored here so a
@@ -472,18 +477,34 @@ def _merge_sections(live, stored):
     return out
 
 
+def _fetch_interesting(path):
+    url = f"{SKYSTATS_URL}/api/stats/interesting/{path}"
+    req = urllib.request.Request(
+        url, headers={"User-Agent": "funplaneviewer-backup/1"})
+    with urllib.request.urlopen(req, timeout=SKYSTATS_TIMEOUT) as resp:
+        payload = json.loads(resp.read().decode("utf-8"))
+    if not isinstance(payload, list):
+        raise ValueError(f"{url} did not return a JSON array")
+    return payload
+
+
 def _fetch_live_sections():
-    """Pull the three interesting-aircraft lists straight from SkyStats."""
-    out = {}
-    for key, path in SKYSTATS_PATHS.items():
-        url = f"{SKYSTATS_URL}/api/stats/interesting/{path}"
-        req = urllib.request.Request(
-            url, headers={"User-Agent": "funplaneviewer-backup/1"})
-        with urllib.request.urlopen(req, timeout=SKYSTATS_TIMEOUT) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
-        if not isinstance(payload, list):
-            raise ValueError(f"{url} did not return a JSON array")
-        out[key] = payload
+    """Pull the interesting-aircraft lists straight from SkyStats, with police
+    folded into Government the way the GUI does it."""
+    out = {key: _fetch_interesting(path) for key, path in SKYSTATS_PATHS.items()}
+
+    # A 404 means this SkyStats build predates the police feed — expected, and
+    # not worth failing a backup over. Anything else is transient, so let it
+    # raise and have the scheduler retry rather than write a short snapshot.
+    try:
+        police = _fetch_interesting(POLICE_PATH)
+    except urllib.error.HTTPError as err:
+        if err.code != 404:
+            raise
+        police = []
+
+    if police:
+        out[POLICE_SECTION] = [*out.get(POLICE_SECTION, []), *police]
     return out
 
 

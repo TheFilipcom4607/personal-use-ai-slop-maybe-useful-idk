@@ -80,10 +80,16 @@ was chosen by hand.
 
 A background thread wakes up every 15 minutes and asks one question: has
 today's snapshot been written yet, and is it past `$FUNPLANEVIEWER_BACKUP_HOUR`?
-If so it pulls the three interesting-aircraft lists from
+If so it pulls the interesting-aircraft lists from
 `$FUNPLANEVIEWER_SKYSTATS_URL`, merges `backup.json` on top (so imported
 history isn't lost), writes `snapshots/YYYY-MM-DD.json.gz`, and deletes
 anything older than `$FUNPLANEVIEWER_BACKUP_KEEP_DAYS`.
+
+Police is folded into Government exactly as the GUI does it, so a restore
+can't quietly drop those airframes. A backend too old to serve
+`/api/stats/interesting/police` returns 404, which is skipped; any other
+error fails the run so the next tick retries rather than writing a
+snapshot that's missing a feed.
 
 Phrasing it as "today has no file yet" rather than "it is now 03:00"
 means a Pi that was powered off at 03:00 still gets its daily backup
