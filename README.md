@@ -40,9 +40,10 @@ It's also optimised for mobile since that was my main priority.
 - Dependency-free CSS bar charts that pack neatly and stay readable on mobile.
 
 **Import and export**
-- CSV export for the current filtered list, with an "include tags" toggle.
-- "CSV — all sections" exports Military, Government and Civilian to one file, ignoring the search and category filters.
-- "One category" exports a single category on its own (Oxcart, RAF, As Seen on TV...), gathered across all three sections, with a filter box for finding it.
+- An Export dialog offering three scopes, each with a live count of what it will write, and an "include tags" toggle:
+  - **This section** — what the open tab is showing, search and category chips included.
+  - **All sections** — Military, Government and Civilian in one file, filters ignored.
+  - **One category** — a single category on its own (Oxcart, RAF, As Seen on TV...), gathered across all three sections, with a filter box for finding it.
 - CSV and JSON import for restoring backups. Each row is routed by its own `group` column, so a combined export lands back in the sections it came from; files without a usable group fall back to the section named in the filename.
 - Imported backups are merged into the live receiver feed instead of replacing it.
 - Imported backup data persists locally in the browser, with optional shared persistence on the Pi (see [server/README.md](server/README.md)).

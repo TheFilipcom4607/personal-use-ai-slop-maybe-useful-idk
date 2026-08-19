@@ -1091,87 +1091,6 @@
   }
 
   /* Export dropdown */
-  .export-drop {
-    display: none;
-    position: fixed;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    overflow: hidden;
-    z-index: 9999;
-    min-width: 220px;
-  }
-  .export-drop.open { display: block; }
-  /* The category list can run long, so the panel scrolls rather than growing
-     past the bottom of the viewport. The cap itself is set when the panel opens,
-     since it depends on how far down the Export button sits. */
-  .export-drop { overflow-y: auto; }
-  .export-drop .export-cat-filter {
-    display: block;
-    width: calc(100% - 24px);
-    margin: 0 12px 6px;
-    padding: 5px 8px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    color: var(--text);
-    font-family: inherit;
-    font-size: 0.78rem;
-  }
-  .export-drop .export-cat-filter:focus { outline: none; border-color: var(--accent); }
-  /* Overridden per-open by fitExportCategoryList once real geometry is known. */
-  .export-drop .export-cat-list { max-height: 200px; overflow-y: auto; }
-  .export-drop .export-cat-list button { justify-content: space-between; gap: 12px; }
-  .export-drop .export-cat-list .label {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .export-drop .export-cat-list .count {
-    flex: none;
-    color: var(--text-dim);
-    font-size: 0.72rem;
-    font-variant-numeric: tabular-nums;
-  }
-  .export-drop .export-cat-empty {
-    padding: 2px 14px 10px;
-    font-size: 0.78rem;
-    color: var(--text-dim);
-  }
-  .export-drop button {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    background: none; border: none;
-    color: var(--text); font-size: 0.85rem;
-    padding: 8px 14px; text-align: left;
-    cursor: pointer;
-  }
-  .export-drop button:hover { background: var(--border); }
-  .export-drop .export-section {
-    padding: 6px 14px 4px;
-    font-size: 0.68rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-  }
-  .export-drop .export-divider {
-    height: 1px;
-    background: var(--border);
-    margin: 4px 0;
-  }
-  .export-toggle .check {
-    display: inline-block;
-    width: 12px;
-    color: transparent;
-    font-weight: 700;
-    font-size: 0.78rem;
-    text-align: center;
-  }
-  .export-toggle[aria-pressed="true"] .check { color: var(--accent); }
-  .export-toggle[aria-pressed="false"] { color: var(--text-dim); }
   .file-input {
     display: none;
   }
@@ -1227,6 +1146,144 @@
     margin-top: 18px;
     flex-wrap: wrap;
   }
+
+  /* Export dialog. Edge-to-edge like the settings and photo dialogs, so it uses
+     the shared .dialog-foot bar rather than .app-dialog-actions. The category
+     list is left uncapped on purpose: .app-dialog already scrolls as a whole, and
+     a list scrolling inside a panel that also scrolls strands rows out of reach. */
+  .export-dialog {
+    width: min(660px, 100%);
+    padding: 0;
+  }
+
+  .export-head {
+    padding: 16px 20px 13px;
+    border-bottom: 1px solid var(--border);
+  }
+  .export-head h2 { margin-bottom: 2px; }
+  .export-sub { font-size: 0.78rem; color: var(--text-dim); }
+
+  .export-body { padding: 15px 20px 18px; }
+  .export-group + .export-group { margin-top: 18px; }
+  .export-group-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 9px;
+  }
+
+  .export-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .export-row + .export-row { margin-top: 8px; }
+  .export-row:hover { border-color: var(--accent); }
+  .export-row-main { flex: 1; min-width: 0; }
+  .export-row-title { display: block; font-size: 0.88rem; font-weight: 600; }
+  .export-row-note {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+  }
+  .export-row-count {
+    flex: none;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .export-cat-filter {
+    display: block;
+    width: 100%;
+    margin-bottom: 9px;
+    padding: 7px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.82rem;
+  }
+  .export-cat-filter:focus { outline: none; border-color: var(--accent); }
+
+  .export-cat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+    gap: 6px;
+  }
+  .export-cat-grid button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.8rem;
+    text-align: left;
+    cursor: pointer;
+  }
+  .export-cat-grid button:hover { border-color: var(--accent); }
+  .export-cat-grid .label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .export-cat-grid .count {
+    flex: none;
+    color: var(--text-dim);
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .export-cat-empty {
+    grid-column: 1 / -1;
+    padding: 4px 2px;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+
+  /* Global option, so it sits in the footer bar next to Close. */
+  .export-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 11px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+  }
+  .export-toggle .check {
+    display: inline-block;
+    width: 12px;
+    color: transparent;
+    font-weight: 700;
+    font-size: 0.78rem;
+    text-align: center;
+  }
+  .export-toggle[aria-pressed="true"] { border-color: var(--accent); }
+  .export-toggle[aria-pressed="true"] .check { color: var(--accent); }
+  .export-toggle[aria-pressed="false"] { color: var(--text-dim); }
 
   /* Photo links dialog. Scoped to a single aircraft, so it leads with which
      aircraft is being edited instead of opening on a search box. */
@@ -1855,7 +1912,7 @@
   @media (max-width: 640px) {
     .app-dialog-overlay { padding: 10px; }
     .app-dialog { padding: 14px; }
-    .settings-dialog, .photo-dialog { padding: 0; }
+    .settings-dialog, .photo-dialog, .export-dialog { padding: 0; }
     .app-dialog-actions { margin-top: 12px; }
 
     .settings-topbar { padding: 14px 14px 12px; }
@@ -1864,6 +1921,9 @@
     .settings-panel { padding: 14px; min-height: 0; }
     .settings-desc { display: none; }
     .backups-list { max-height: min(38vh, 210px); }
+
+    .export-head { padding: 14px 14px 11px; }
+    .export-body { padding: 13px 14px 15px; }
 
     .photo-head { padding: 12px 14px; gap: 11px; }
     .photo-head-thumb { width: 62px; height: 44px; }
@@ -2002,27 +2062,56 @@
       <button class="btn" id="btnRefresh">Refresh</button>
       <button class="btn" id="btnImport" title="Import a CSV or JSON export — combined files are split back into Mil/Gov/Civ">Import</button>
       <input class="file-input" type="file" id="importFile" accept=".csv,.json,text/csv,application/json">
-      <div class="export-wrap" id="exportWrap">
-        <button class="btn" id="btnExport" title="Export this section or every section at once">Export ▾</button>
-      </div>
+      <button class="btn" id="btnExport" title="Export this section, every section, or a single category">Export</button>
     </div>
     <div class="chip-row" id="categoryChips"></div>
   </div>
 </div>
 
-<div class="export-drop" id="exportDrop">
-  <div class="export-section">Options</div>
-  <button type="button" class="export-toggle" id="btnExportTags" aria-pressed="true">
-    <span class="check">✓</span>Include tags
-  </button>
-  <div class="export-divider"></div>
-  <div class="export-section">Download as</div>
-  <button id="exportCsv" title="Only the aircraft currently listed under this tab"><span class="check"></span>CSV — this section</button>
-  <button id="exportCsvAll" title="Every Mil/Gov/Civ aircraft in one file, ignoring search and category filters"><span class="check"></span>CSV — all sections</button>
-  <div class="export-divider"></div>
-  <div class="export-section">One category</div>
-  <input type="text" class="export-cat-filter" id="exportCatFilter" placeholder="Filter categories…" autocomplete="off" spellcheck="false" aria-label="Filter categories">
-  <div class="export-cat-list" id="exportCatList"></div>
+<div class="app-dialog-overlay" id="exportDialog" aria-hidden="true">
+  <div class="app-dialog export-dialog" role="dialog" aria-modal="true" aria-labelledby="exportDialogTitle">
+    <div class="export-head">
+      <h2 id="exportDialogTitle">Export aircraft</h2>
+      <div class="export-sub" id="exportSub"></div>
+    </div>
+
+    <div class="export-body">
+      <div class="export-group">
+        <div class="export-group-label">Whole lists</div>
+        <button type="button" class="export-row" id="exportCsv">
+          <span class="export-row-main">
+            <span class="export-row-title" id="exportCsvTitle">This section</span>
+            <span class="export-row-note" id="exportCsvNote"></span>
+          </span>
+          <span class="export-row-count" id="exportCsvCount">0</span>
+        </button>
+        <button type="button" class="export-row" id="exportCsvAll">
+          <span class="export-row-main">
+            <span class="export-row-title">All sections</span>
+            <span class="export-row-note">Military, Government and Civilian in one file. Reimports back into their own tabs.</span>
+          </span>
+          <span class="export-row-count" id="exportCsvAllCount">0</span>
+        </button>
+      </div>
+
+      <div class="export-group">
+        <div class="export-group-label">One category</div>
+        <input type="text" class="export-cat-filter" id="exportCatFilter" placeholder="Filter categories…" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Filter categories">
+        <div class="export-cat-grid" id="exportCatList"></div>
+      </div>
+    </div>
+
+    <div class="dialog-foot">
+      <div class="dialog-foot-left">
+        <button type="button" class="export-toggle" id="btnExportTags" aria-pressed="true">
+          <span class="check">✓</span>Include tags
+        </button>
+      </div>
+      <div class="dialog-foot-right">
+        <button class="btn" type="button" id="exportDialogClose">Close</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div id="content">
@@ -2230,7 +2319,7 @@
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58 0-.29-.01-1.05-.02-2.06-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.34-5.47-5.95 0-1.31.47-2.39 1.24-3.23-.13-.3-.54-1.53.11-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.65 1.65.24 2.88.12 3.18.77.84 1.23 1.92 1.23 3.23 0 4.62-2.81 5.64-5.49 5.94.43.37.82 1.1.82 2.22 0 1.6-.02 2.9-.02 3.29 0 .32.22.7.82.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z"/></svg>
           <span>GitHub</span>
         </a>
-        <span class="app-version" id="appVersion" title="App version (bump in index.html when releasing)">v1.18.0</span>
+        <span class="app-version" id="appVersion" title="App version (bump in index.html when releasing)">v1.19.0</span>
       </div>
       <div class="dialog-foot-right">
         <button class="btn" type="button" id="settingsSecondary" hidden></button>
@@ -4490,19 +4579,37 @@ function exportCategoryCSV(cat) {
   downloadCSV(taggedPlanes(p => (p.category || '') === cat), categorySlug(cat));
 }
 
-// Keep the panel to one scrolling area — a list that scrolls inside a panel that
-// also scrolls leaves categories stranded out of reach. Measured with the panel
-// already visible, since a display:none element has no layout, and off
-// scrollHeight rather than the rendered box, which max-height has already clamped.
-function fitExportCategoryList(rect) {
-  const drop = document.getElementById('exportDrop');
-  const list = document.getElementById('exportCatList');
-  const chrome = drop.scrollHeight - list.clientHeight;   // everything above the list
-  const border = drop.offsetHeight - drop.clientHeight;  // scrollHeight ignores the panel border
-  const room = window.innerHeight - rect.bottom - 18 - chrome - border;
-  // Roomy: cap the list so it scrolls inside a panel that fits on screen.
-  // Cramped: uncap it and let the panel do all the scrolling instead.
-  list.style.maxHeight = room >= 120 ? `${room}px` : 'none';
+function openExportDialog() {
+  const overlay = document.getElementById('exportDialog');
+  const total = SECTIONS.reduce((n, section) => n + (data[section] || []).length, 0);
+  const onTab = (data[activeSection] || []).length;
+  const showing = getFiltered().length;
+
+  document.getElementById('exportSub').textContent =
+    `${total} aircraft loaded across Military, Government and Civilian`;
+  document.getElementById('exportCsvTitle').textContent = SECTION_LABELS[activeSection];
+  document.getElementById('exportCsvNote').textContent = showing === onTab
+    ? 'Everything on this tab'
+    : `Only what the search and category chips leave showing, out of ${onTab} on this tab`;
+  document.getElementById('exportCsvCount').textContent = showing;
+  document.getElementById('exportCsvAllCount').textContent = total;
+
+  document.getElementById('exportCatFilter').value = '';
+  buildExportCategoryList();
+
+  overlay.classList.add('open');
+  overlay.setAttribute('aria-hidden', 'false');
+  // Typing straight into the filter is the fastest route to a single category,
+  // and the guard keeps it from throwing up a keyboard on touch.
+  if (window.matchMedia('(pointer: fine)').matches) {
+    document.getElementById('exportCatFilter').focus();
+  }
+}
+
+function closeExportDialog() {
+  const overlay = document.getElementById('exportDialog');
+  overlay.classList.remove('open');
+  overlay.setAttribute('aria-hidden', 'true');
 }
 
 function buildExportCategoryList() {
@@ -4526,7 +4633,7 @@ function buildExportCategoryList() {
     btn.innerHTML = `<span class="label">${esc(cat || '(no category)')}</span><span class="count">${count}</span>`;
     btn.addEventListener('click', () => {
       exportCategoryCSV(cat);
-      document.getElementById('exportDrop').classList.remove('open');
+      closeExportDialog();
     });
     list.appendChild(btn);
   });
@@ -5253,6 +5360,10 @@ document.addEventListener('keydown', e => {
   }
   if (document.getElementById('settingsMenu').classList.contains('open')) {
     closeSettingsMenu();
+    return;
+  }
+  if (document.getElementById('exportDialog').classList.contains('open')) {
+    closeExportDialog();
     return;
   }
   if (document.getElementById('modal').classList.contains('open')) {
@@ -5993,38 +6104,25 @@ document.getElementById('manualImagePlanespotters').addEventListener('click', (e
   window.open(url, '_blank', 'noopener,noreferrer');
 });
 
-// Export dropdown
-const exportDrop = document.getElementById('exportDrop');
-document.getElementById('btnExport').addEventListener('click', (e) => {
-  e.stopPropagation();
-  const isOpen = exportDrop.classList.contains('open');
-  if (isOpen) { exportDrop.classList.remove('open'); return; }
-
-  const rect = e.currentTarget.getBoundingClientRect();
-  exportDrop.style.top   = (rect.bottom + 6) + 'px';
-  exportDrop.style.right = (window.innerWidth - rect.right) + 'px';
-  exportDrop.style.maxHeight = Math.max(160, window.innerHeight - rect.bottom - 18) + 'px';
-  // Categories shift with every refresh, so rebuild from scratch each open.
-  document.getElementById('exportCatFilter').value = '';
-  buildExportCategoryList();
-  exportDrop.classList.add('open');
-  fitExportCategoryList(rect);
+// Export dialog
+document.getElementById('btnExport').addEventListener('click', openExportDialog);
+document.getElementById('exportDialogClose').addEventListener('click', closeExportDialog);
+document.getElementById('exportDialog').addEventListener('click', (e) => {
+  if (e.target.id === 'exportDialog') closeExportDialog();
 });
 document.getElementById('exportCatFilter').addEventListener('input', buildExportCategoryList);
-exportDrop.addEventListener('click', (e) => e.stopPropagation());
 document.getElementById('btnExportTags').addEventListener('click', (e) => {
   const btn = e.currentTarget;
   btn.setAttribute('aria-pressed', btn.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
 });
 document.getElementById('exportCsv').addEventListener('click', () => {
   exportCSV();
-  exportDrop.classList.remove('open');
+  closeExportDialog();
 });
 document.getElementById('exportCsvAll').addEventListener('click', () => {
   exportAllCSV();
-  exportDrop.classList.remove('open');
+  closeExportDialog();
 });
-document.addEventListener('click', () => exportDrop.classList.remove('open'));
 
 // Modal close / overlay
 document.getElementById('modal').addEventListener('click', (e) => {
