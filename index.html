@@ -684,6 +684,25 @@
   .img-nav.left { left: 8px; }
   .img-nav.right { right: 8px; }
 
+  /* Deep-link to the live map. Bottom-right so it clears the centered image
+     dots and the vertically-centered hover arrows, and always visible rather
+     than hover-gated — there is no hover on touch. */
+  .card-track {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    line-height: 1.5;
+    color: #fff;
+    text-decoration: none;
+  }
+  .card-track:hover { background: var(--accent); }
+
   .card-img-dots {
     position: absolute;
     bottom: 6px;
@@ -1080,9 +1099,45 @@
     border-radius: 6px;
     overflow: hidden;
     z-index: 9999;
-    min-width: 150px;
+    min-width: 220px;
   }
   .export-drop.open { display: block; }
+  /* The category list can run long, so the panel scrolls rather than growing
+     past the bottom of the viewport. The cap itself is set when the panel opens,
+     since it depends on how far down the Export button sits. */
+  .export-drop { overflow-y: auto; }
+  .export-drop .export-cat-filter {
+    display: block;
+    width: calc(100% - 24px);
+    margin: 0 12px 6px;
+    padding: 5px 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.78rem;
+  }
+  .export-drop .export-cat-filter:focus { outline: none; border-color: var(--accent); }
+  /* Overridden per-open by fitExportCategoryList once real geometry is known. */
+  .export-drop .export-cat-list { max-height: 200px; overflow-y: auto; }
+  .export-drop .export-cat-list button { justify-content: space-between; gap: 12px; }
+  .export-drop .export-cat-list .label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .export-drop .export-cat-list .count {
+    flex: none;
+    color: var(--text-dim);
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .export-drop .export-cat-empty {
+    padding: 2px 14px 10px;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+  }
   .export-drop button {
     display: flex;
     align-items: center;
@@ -1964,6 +2019,10 @@
   <div class="export-section">Download as</div>
   <button id="exportCsv" title="Only the aircraft currently listed under this tab"><span class="check"></span>CSV — this section</button>
   <button id="exportCsvAll" title="Every Mil/Gov/Civ aircraft in one file, ignoring search and category filters"><span class="check"></span>CSV — all sections</button>
+  <div class="export-divider"></div>
+  <div class="export-section">One category</div>
+  <input type="text" class="export-cat-filter" id="exportCatFilter" placeholder="Filter categories…" autocomplete="off" spellcheck="false" aria-label="Filter categories">
+  <div class="export-cat-list" id="exportCatList"></div>
 </div>
 
 <div id="content">
@@ -2171,7 +2230,7 @@
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58 0-.29-.01-1.05-.02-2.06-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.34-5.47-5.95 0-1.31.47-2.39 1.24-3.23-.13-.3-.54-1.53.11-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.65 1.65.24 2.88.12 3.18.77.84 1.23 1.92 1.23 3.23 0 4.62-2.81 5.64-5.49 5.94.43.37.82 1.1.82 2.22 0 1.6-.02 2.9-.02 3.29 0 .32.22.7.82.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z"/></svg>
           <span>GitHub</span>
         </a>
-        <span class="app-version" id="appVersion" title="App version (bump in index.html when releasing)">v1.17.0</span>
+        <span class="app-version" id="appVersion" title="App version (bump in index.html when releasing)">v1.18.0</span>
       </div>
       <div class="dialog-foot-right">
         <button class="btn" type="button" id="settingsSecondary" hidden></button>
@@ -4382,23 +4441,95 @@ function downloadCSV(planes, scope) {
 }
 
 // Just what the current tab is showing, search and category chips included.
+// Group is normalized here too, so all three CSV flavours write the same
+// lowercase mil/gov/civ rather than the feed's raw "Mil"/"Pol" casing.
 function exportCSV() {
-  downloadCSV(getFiltered().map(withEffectiveImages), activeSection);
+  const planes = getFiltered().map(p => ({
+    ...withEffectiveImages(p),
+    group: normalizeGroup(p.group, activeSection)
+  }));
+  downloadCSV(planes, activeSection);
 }
 
-// Every tab in one file. Filters are deliberately ignored — "all" means all — and
-// each row keeps a mil/gov/civ group column so importing the file back splits the
-// aircraft into the sections they came from.
-function exportAllCSV() {
-  const planes = SECTIONS.flatMap(section =>
-    (data[section] || []).map(p => ({
-      ...withEffectiveImages(p),
-      // Live police records arrive tagged "Pol", which has no tab of its own; pin
-      // the row to the section it is actually displayed in so the round-trip is exact.
-      group: normalizeGroup(p.group, section)
-    }))
+// Rows gathered across every tab, each pinned to the section it is displayed
+// under so the group column survives a round-trip. Live police records arrive
+// tagged "Pol", which has no tab of its own, hence the normalize. Search and
+// category chips are deliberately ignored: these exports pick their own scope.
+function taggedPlanes(keep) {
+  return SECTIONS.flatMap(section =>
+    (data[section] || [])
+      .filter(p => !keep || keep(p))
+      .map(p => ({ ...withEffectiveImages(p), group: normalizeGroup(p.group, section) }))
   );
-  downloadCSV(planes, 'all');
+}
+
+// Every tab in one file — "all" means all.
+function exportAllCSV() {
+  downloadCSV(taggedPlanes(), 'all');
+}
+
+// Every category present anywhere, with a combined count, biggest first — the
+// same ordering the chip row uses so the two lists read alike.
+function exportCategories() {
+  const totals = new Map();
+  SECTIONS.forEach(section => (data[section] || []).forEach(p => {
+    const cat = p.category || '';
+    totals.set(cat, (totals.get(cat) || 0) + 1);
+  }));
+  return [...totals.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
+function categorySlug(cat) {
+  const slug = String(cat || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return slug || 'uncategorized';
+}
+
+// One category across every section: "As Seen on TV" can span Civ and Mil, and
+// each row still carries its own group so it reimports into the right tab.
+function exportCategoryCSV(cat) {
+  downloadCSV(taggedPlanes(p => (p.category || '') === cat), categorySlug(cat));
+}
+
+// Keep the panel to one scrolling area — a list that scrolls inside a panel that
+// also scrolls leaves categories stranded out of reach. Measured with the panel
+// already visible, since a display:none element has no layout, and off
+// scrollHeight rather than the rendered box, which max-height has already clamped.
+function fitExportCategoryList(rect) {
+  const drop = document.getElementById('exportDrop');
+  const list = document.getElementById('exportCatList');
+  const chrome = drop.scrollHeight - list.clientHeight;   // everything above the list
+  const border = drop.offsetHeight - drop.clientHeight;  // scrollHeight ignores the panel border
+  const room = window.innerHeight - rect.bottom - 18 - chrome - border;
+  // Roomy: cap the list so it scrolls inside a panel that fits on screen.
+  // Cramped: uncap it and let the panel do all the scrolling instead.
+  list.style.maxHeight = room >= 120 ? `${room}px` : 'none';
+}
+
+function buildExportCategoryList() {
+  const list = document.getElementById('exportCatList');
+  const q = document.getElementById('exportCatFilter').value.toLowerCase().trim();
+  const cats = exportCategories().filter(([cat]) => !q || cat.toLowerCase().includes(q));
+  list.innerHTML = '';
+
+  if (!cats.length) {
+    const empty = document.createElement('div');
+    empty.className = 'export-cat-empty';
+    empty.textContent = q ? 'No matching categories.' : 'No aircraft loaded.';
+    list.appendChild(empty);
+    return;
+  }
+
+  cats.forEach(([cat, count]) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.title = `Export the ${count} aircraft in ${cat || 'no category'}`;
+    btn.innerHTML = `<span class="label">${esc(cat || '(no category)')}</span><span class="count">${count}</span>`;
+    btn.addEventListener('click', () => {
+      exportCategoryCSV(cat);
+      document.getElementById('exportDrop').classList.remove('open');
+    });
+    list.appendChild(btn);
+  });
 }
 
 function parseCSV(text) {
@@ -4801,6 +4932,12 @@ async function importFile(file) {
 // The badge/colour group for a plane. Live police records come back tagged "Pol",
 // which has no tab, badge or colour of its own — render those as Government so
 // they match the section they were folded into.
+// airplanes.live's globe view keys off the lowercase ICAO hex. Shared by the
+// card's Track chip and the receipt printer's QR module so the two can't drift.
+function globeUrl(hex) {
+  return `https://globe.airplanes.live/?icao=${encodeURIComponent(String(hex || '').trim().toLowerCase())}`;
+}
+
 function displayGroup(p) {
   const g = String(p.group || '').toLowerCase();
   return g.startsWith('pol') ? POLICE_SECTION : g;
@@ -4895,6 +5032,8 @@ function cardHTML(p, fresh) {
         ` : ''}
         <div class="card-category">${esc(p.category)}</div>
         ${groupBadge(p)}
+        <a class="card-track" href="${esc(globeUrl(p.hex))}" target="_blank" rel="noopener noreferrer"
+           data-action="open-globe" title="Track ${esc(p.registration || p.hex)} on airplanes.live">Track</a>
       </div>
       <div class="card-body" data-action="open-modal" style="cursor:pointer">
         <div class="card-type">${esc(p.type || p.icao_type)}</div>
@@ -5189,6 +5328,9 @@ document.getElementById('content').addEventListener('click', (e) => {
   const actionEl = e.target.closest('[data-action]');
   const action = actionEl ? actionEl.dataset.action : null;
 
+  // The Track chip is a real link — let the browser navigate instead of
+  // swallowing the click into the detail modal.
+  if (action === 'open-globe') return;
   if (action === 'img-prev') { e.stopPropagation(); cycleImg(hex, -1); return; }
   if (action === 'img-next') { e.stopPropagation(); cycleImg(hex, 1); return; }
   if (action === 'open-modal' || !action) { openModal(hex); }
@@ -5561,7 +5703,7 @@ function buildPrintJob(p, hex, imageModule, imageHost) {
   }
 
   modules.push({ type: 'rule', char: '-', width: 32, after: 1 });
-  modules.push({ type: 'qr', data: `https://globe.airplanes.live/?icao=${hex.toLowerCase()}`,
+  modules.push({ type: 'qr', data: globeUrl(hex),
                  size: 6, ecc: 'M', justify: 'center', after: 1 });
   modules.push({ type: 'feed', lines: 1 });
   modules.push({ type: 'text', text: 'HEX:', justify: 'center' });
@@ -5856,13 +5998,19 @@ const exportDrop = document.getElementById('exportDrop');
 document.getElementById('btnExport').addEventListener('click', (e) => {
   e.stopPropagation();
   const isOpen = exportDrop.classList.contains('open');
-  if (!isOpen) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    exportDrop.style.top  = (rect.bottom + 6) + 'px';
-    exportDrop.style.right = (window.innerWidth - rect.right) + 'px';
-  }
-  exportDrop.classList.toggle('open');
+  if (isOpen) { exportDrop.classList.remove('open'); return; }
+
+  const rect = e.currentTarget.getBoundingClientRect();
+  exportDrop.style.top   = (rect.bottom + 6) + 'px';
+  exportDrop.style.right = (window.innerWidth - rect.right) + 'px';
+  exportDrop.style.maxHeight = Math.max(160, window.innerHeight - rect.bottom - 18) + 'px';
+  // Categories shift with every refresh, so rebuild from scratch each open.
+  document.getElementById('exportCatFilter').value = '';
+  buildExportCategoryList();
+  exportDrop.classList.add('open');
+  fitExportCategoryList(rect);
 });
+document.getElementById('exportCatFilter').addEventListener('input', buildExportCategoryList);
 exportDrop.addEventListener('click', (e) => e.stopPropagation());
 document.getElementById('btnExportTags').addEventListener('click', (e) => {
   const btn = e.currentTarget;

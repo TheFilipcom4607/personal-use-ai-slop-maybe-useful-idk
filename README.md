@@ -20,6 +20,7 @@ It's also optimised for mobile since that was my main priority.
 - Sort by last seen, type, operator, or category.
 - Category filter chips with live counts.
 - Aircraft detail modal with image gallery, tags, metadata, and last-seen time.
+- A "Track" button on each card opens that airframe on [globe.airplanes.live](https://globe.airplanes.live/) by hex, in a new tab.
 - Image fallback cards for aircraft without photos.
 - 24-hour time formatting.
 - Mobile-friendly layout with a collapsing header.
@@ -41,6 +42,7 @@ It's also optimised for mobile since that was my main priority.
 **Import and export**
 - CSV export for the current filtered list, with an "include tags" toggle.
 - "CSV — all sections" exports Military, Government and Civilian to one file, ignoring the search and category filters.
+- "One category" exports a single category on its own (Oxcart, RAF, As Seen on TV...), gathered across all three sections, with a filter box for finding it.
 - CSV and JSON import for restoring backups. Each row is routed by its own `group` column, so a combined export lands back in the sections it came from; files without a usable group fall back to the section named in the filename.
 - Imported backups are merged into the live receiver feed instead of replacing it.
 - Imported backup data persists locally in the browser, with optional shared persistence on the Pi (see [server/README.md](server/README.md)).
