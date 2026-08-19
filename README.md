@@ -40,7 +40,8 @@ It's also optimised for mobile since that was my main priority.
 
 **Import and export**
 - CSV export for the current filtered list, with an "include tags" toggle.
-- CSV and JSON import for restoring backups.
+- "CSV — all sections" exports Military, Government and Civilian to one file, ignoring the search and category filters.
+- CSV and JSON import for restoring backups. Each row is routed by its own `group` column, so a combined export lands back in the sections it came from; files without a usable group fall back to the section named in the filename.
 - Imported backups are merged into the live receiver feed instead of replacing it.
 - Imported backup data persists locally in the browser, with optional shared persistence on the Pi (see [server/README.md](server/README.md)).
 - Server-side backups are versioned before every overwrite, and a save that would wipe a section that still has aircraft is refused (see [Backup safety](server/README.md#backup-safety)).

@@ -1945,10 +1945,10 @@
         </button>
       </div>
       <button class="btn" id="btnRefresh">Refresh</button>
-      <button class="btn" id="btnImport" title="Import CSV or JSON export">Import</button>
+      <button class="btn" id="btnImport" title="Import a CSV or JSON export — combined files are split back into Mil/Gov/Civ">Import</button>
       <input class="file-input" type="file" id="importFile" accept=".csv,.json,text/csv,application/json">
       <div class="export-wrap" id="exportWrap">
-        <button class="btn" id="btnExport" title="Export current list">Export ▾</button>
+        <button class="btn" id="btnExport" title="Export this section or every section at once">Export ▾</button>
       </div>
     </div>
     <div class="chip-row" id="categoryChips"></div>
@@ -1962,7 +1962,8 @@
   </button>
   <div class="export-divider"></div>
   <div class="export-section">Download as</div>
-  <button id="exportCsv"><span class="check"></span>CSV</button>
+  <button id="exportCsv" title="Only the aircraft currently listed under this tab"><span class="check"></span>CSV — this section</button>
+  <button id="exportCsvAll" title="Every Mil/Gov/Civ aircraft in one file, ignoring search and category filters"><span class="check"></span>CSV — all sections</button>
 </div>
 
 <div id="content">
@@ -2170,7 +2171,7 @@
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58 0-.29-.01-1.05-.02-2.06-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.34-5.47-5.95 0-1.31.47-2.39 1.24-3.23-.13-.3-.54-1.53.11-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.65 1.65.24 2.88.12 3.18.77.84 1.23 1.92 1.23 3.23 0 4.62-2.81 5.64-5.49 5.94.43.37.82 1.1.82 2.22 0 1.6-.02 2.9-.02 3.29 0 .32.22.7.82.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z"/></svg>
           <span>GitHub</span>
         </a>
-        <span class="app-version" id="appVersion" title="App version (bump in index.html when releasing)">v1.16.0</span>
+        <span class="app-version" id="appVersion" title="App version (bump in index.html when releasing)">v1.17.0</span>
       </div>
       <div class="dialog-foot-right">
         <button class="btn" type="button" id="settingsSecondary" hidden></button>
@@ -2236,6 +2237,10 @@ let API_BASE = loadStoredApiBase() || defaultApiBase();
 // rather than armed forces, so they're folded into Government everywhere: the
 // live feed, the group badges, and the import normalizer all point here.
 const POLICE_SECTION = 'gov';
+// The three tabs, in display order. Export-all writes them in this order and
+// import routes each row back into one of them via its group column.
+const SECTIONS = ['mil', 'gov', 'civ'];
+const SECTION_LABELS = { mil: 'Military', gov: 'Government', civ: 'Civilian' };
 const API = {
   mil: '',
   gov: '',
@@ -2509,7 +2514,7 @@ function saveLiveBaseline(peak) {
 // persisted, so a drop is still caught after a reload — which is exactly when
 // you'd hit it, since a reload resets any in-memory comparison.
 function checkLiveCounts() {
-  const labels = { mil: 'Military', gov: 'Government', civ: 'Civilian' };
+  const labels = SECTION_LABELS;
   const now = liveCounts();
   const peak = loadLiveBaseline();
   const shrunk = [];
@@ -4344,25 +4349,56 @@ function exportIncludesTags() {
   return btn ? btn.getAttribute('aria-pressed') === 'true' : true;
 }
 
-function exportFilename(ext) {
+function exportFilename(scope, ext) {
   const suffix = exportIncludesTags() ? '' : '-notags';
-  return `aircraft-${activeSection}-${datestamp()}${suffix}.${ext}`;
+  return `aircraft-${scope}-${datestamp()}${suffix}.${ext}`;
 }
 
-function exportCSV() {
+function exportFields() {
   const baseFields = ['hex','type','operator','flight','registration','icao_type','category','group','image_link_1','image_link_2','image_link_3','image_link_4','seen','seen_epoch'];
-  const fields = exportIncludesTags()
+  return exportIncludesTags()
     ? [...baseFields.slice(0, 8), 'tag1','tag2','tag3', ...baseFields.slice(8)]
     : baseFields;
-  const header = fields.join(',');
-  const rows = getFiltered().map(withEffectiveImages).map(p =>
+}
+
+function buildCSV(planes) {
+  const fields = exportFields();
+  const rows = planes.map(p =>
     fields.map(f => {
       const v = String(p[f] ?? '');
       return (v.includes(',') || v.includes('"') || v.includes('\n'))
         ? `"${v.replace(/"/g, '""')}"` : v;
     }).join(',')
   );
-  triggerDownload([header, ...rows].join('\n'), exportFilename('csv'), 'text/csv');
+  return [fields.join(','), ...rows].join('\n');
+}
+
+function downloadCSV(planes, scope) {
+  if (!planes.length) {
+    appAlert('Nothing to Export', 'There are no aircraft in this list to export.');
+    return;
+  }
+  triggerDownload(buildCSV(planes), exportFilename(scope, 'csv'), 'text/csv');
+}
+
+// Just what the current tab is showing, search and category chips included.
+function exportCSV() {
+  downloadCSV(getFiltered().map(withEffectiveImages), activeSection);
+}
+
+// Every tab in one file. Filters are deliberately ignored — "all" means all — and
+// each row keeps a mil/gov/civ group column so importing the file back splits the
+// aircraft into the sections they came from.
+function exportAllCSV() {
+  const planes = SECTIONS.flatMap(section =>
+    (data[section] || []).map(p => ({
+      ...withEffectiveImages(p),
+      // Live police records arrive tagged "Pol", which has no tab of its own; pin
+      // the row to the section it is actually displayed in so the round-trip is exact.
+      group: normalizeGroup(p.group, section)
+    }))
+  );
+  downloadCSV(planes, 'all');
 }
 
 function parseCSV(text) {
@@ -4425,7 +4461,20 @@ function parseImport(text, filename) {
   if (filename.toLowerCase().endsWith('.json') || trimmed.startsWith('[') || trimmed.startsWith('{')) {
     const parsed = JSON.parse(trimmed);
     if (Array.isArray(parsed)) return parsed;
-    if (Array.isArray(parsed[targetSection])) return parsed[targetSection];
+    // Combined exports and the sidecar's backup.json hold one array per section.
+    // Take every section at once and stamp each row with the group it was filed
+    // under, so importAircraft can put it straight back there.
+    const sections = parsed && parsed.backups && typeof parsed.backups === 'object'
+      ? parsed.backups
+      : parsed;
+    const combined = SECTIONS
+      .filter(section => Array.isArray(sections && sections[section]))
+      .flatMap(section => sections[section].map(item => ({
+        ...(item && typeof item === 'object' ? item : {}),
+        group: normalizeGroup(item && item.group, section)
+      })));
+    if (combined.length) return combined;
+    if (sections && Array.isArray(sections[targetSection])) return sections[targetSection];
     throw new Error('JSON import must be an exported aircraft array');
   }
 
@@ -4625,9 +4674,11 @@ function loadImportedSnapshot() {
 }
 
 async function importAircraft(items, filename) {
-  const targetSection = sectionFromImportFilename(filename);
+  // Rows carry their own mil/gov/civ group; the filename only decides where rows
+  // without a usable one land, which is how single-section exports still work.
+  const fallbackSection = sectionFromImportFilename(filename);
   const imported = items
-    .map(item => normalizeImportedPlane(item, targetSection))
+    .map(item => normalizeImportedPlane(item, fallbackSection))
     .filter(p => p.hex);
   if (!imported.length) throw new Error('No aircraft rows with a hex/ICAO value were found');
 
@@ -4655,7 +4706,7 @@ async function importAircraft(items, filename) {
   )) {
     try {
       document.getElementById('updatedPill').textContent = 'Pulling backup tags...';
-      filledTags = applyTagLookup(imported, await fetchPlaneTagIndex(), targetSection);
+      filledTags = applyTagLookup(imported, await fetchPlaneTagIndex(), fallbackSection);
     } catch (err) {
       await appAlert(
         'Could Not Pull Tags',
@@ -4665,14 +4716,29 @@ async function importAircraft(items, filename) {
   }
 
   activeCategories.clear();
-  imported.forEach(p => upsertBackup(targetSection, p));
+  imported.forEach(p => {
+    if (!importedBackups[p.group]) p.group = fallbackSection;
+    upsertBackup(p.group, p);
+  });
   refreshMergedData();
-  const currentSet = new Set(data[targetSection].map(p => p.hex));
-  const prev = prevHexes[targetSection] || new Set();
-  newHexes[targetSection] = new Set(imported.map(p => p.hex).filter(hex => !prev.has(hex)));
-  prevHexes[targetSection] = currentSet;
-  dataSig[targetSection] = computeSignature(data[targetSection]);
+
+  const bySection = { mil: [], gov: [], civ: [] };
+  imported.forEach(p => bySection[p.group].push(p));
+  const touched = SECTIONS.filter(section => bySection[section].length);
+
+  touched.forEach(section => {
+    const prev = prevHexes[section] || new Set();
+    newHexes[section] = new Set(bySection[section].map(p => p.hex).filter(hex => !prev.has(hex)));
+    prevHexes[section] = new Set(data[section].map(p => p.hex));
+    dataSig[section] = computeSignature(data[section]);
+  });
   imageIndices = {};
+
+  // Stay put if the open tab got anything out of this import; otherwise jump to
+  // whichever section received the most aircraft.
+  const targetSection = touched.includes(activeSection)
+    ? activeSection
+    : (touched.slice().sort((a, b) => bySection[b].length - bySection[a].length)[0] || activeSection);
 
   updateSectionCounts();
   if (targetSection !== activeSection) {
@@ -4717,8 +4783,13 @@ async function importAircraft(items, filename) {
     filledImages ? `pulled ${filledImages} image sets` : '',
     filledTags ? `pulled ${filledTags} tag sets` : ''
   ].filter(Boolean).join(', ');
+  // A combined file lands in several tabs at once, so spell out the split rather
+  // than leaving the user to guess where the aircraft went.
+  const splitSummary = touched.length > 1
+    ? ` (${touched.map(section => `${bySection[section].length} ${SECTION_LABELS[section]}`).join(', ')})`
+    : '';
   document.getElementById('updatedPill').textContent =
-    `Added ${imported.length} backup aircraft${enrichSummary ? `, ${enrichSummary}` : ''} from ${filename}${persistNote}`;
+    `Added ${imported.length} backup aircraft${splitSummary}${enrichSummary ? `, ${enrichSummary}` : ''} from ${filename}${persistNote}`;
 }
 
 async function importFile(file) {
@@ -5799,6 +5870,10 @@ document.getElementById('btnExportTags').addEventListener('click', (e) => {
 });
 document.getElementById('exportCsv').addEventListener('click', () => {
   exportCSV();
+  exportDrop.classList.remove('open');
+});
+document.getElementById('exportCsvAll').addEventListener('click', () => {
+  exportAllCSV();
   exportDrop.classList.remove('open');
 });
 document.addEventListener('click', () => exportDrop.classList.remove('open'));
