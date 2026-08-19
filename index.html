@@ -684,24 +684,29 @@
   .img-nav.left { left: 8px; }
   .img-nav.right { right: 8px; }
 
-  /* Deep-link to the live map. Bottom-right so it clears the centered image
-     dots and the vertically-centered hover arrows, and always visible rather
-     than hover-gated — there is no hover on touch. */
+  /* Deep-link to the live map, wearing the airplanes.live mark so it reads as
+     "this opens airplanes.live" without needing a label. Declared once here as a
+     background rather than inlined into every card's markup. Bottom-right so it
+     clears the centered image dots and the vertically-centered hover arrows, and
+     always visible rather than hover-gated — there is no hover on touch. */
   .card-track {
+    display: block;
     position: absolute;
     bottom: 8px;
     right: 8px;
-    background: rgba(0,0,0,0.6);
-    backdrop-filter: blur(4px);
-    padding: 3px 8px;
-    border-radius: 6px;
-    font-size: 0.68rem;
-    font-weight: 600;
-    line-height: 1.5;
-    color: #fff;
-    text-decoration: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAoCAYAAACM/rhtAAABlGlDQ1BJQ0MgUHJvZmlsZQAAKJF9kc8rRFEUxz8GmUQWLCws3mLY+JGQLJlZTIqaBuXXwps3v9TMc3szkrJUtooSG78WtlZYWtgqpfwo+QNkRWyk59x5NIM4r9v59L33e+5554LvxFQqU9EJWTvvRMNBY3xi0qh6wE+9fAFaTSunBiKRISS+8vd4vaJM58t2Xev3/r9RG0/kLCgzhPst5eSFZ4QjC3ml+VC4wZGmhM80pzy+0Rzz+LFwZjQaAp+uaVhpMy6sa7ZZaScrrPsOxLNxrSuPbc3rmmMl3lQJZzPz1mef+g9rEvbYiD4vq4kwgwwTwSDGPLNkyNMu2RYlR1T2g3/4ewr+EHMoFnHEkyItboMBUZRUSggPSiWLDtqEu+iU1avf5ufMi9rcDvS9QPlqUYttwPEKNN4WtcA21C3D0ZkyHbMglcvyJZPwdCBPMgH1F1A9lUt2d3nd1wSh8t51n5uhag3eV133bdd13/fEfAentjfnz1rsX8PoEgydw+YWtKTkzuk/5uEvzOP/mflLZ/4BdMV4A1D5JUsAAAD2ZVhJZk1NACoAAAAIAAgBDgACAAAAEgAAAG4BEgADAAAAAQABAAABGgAFAAAAAQAAAIABGwAFAAAAAQAAAIgBKAADAAAAAQADAAABMQACAAAADQAAAJABMgACAAAAFAAAAJ6HaQAEAAAAAQAAALIAAAAAQ3JlYXRlZCB3aXRoIEdJTVAAAAABLAAAAAEAAAEsAAAAAUdJTVAgMi4xMC4yOAAAMjAyMzowOToyMyAxMTo1NjoxNgAAA5KGAAcAAAAZAAAA3KACAAQAAAABAAAAKKADAAQAAAABAAAAKAAAAABBU0NJSQAAAENyZWF0ZWQgd2l0aCBHSU1QAFcC8mIAAAAJcEhZcwAALiMAAC4jAXilP3YAAAQvaVRYdFhNTDpjb20uYWRvYmUueG1wAAAAAAA8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2JlOm5zOm1ldGEvIiB4OnhtcHRrPSJYTVAgQ29yZSA2LjAuMCI+CiAgIDxyZGY6UkRGIHhtbG5zOnJkZj0iaHR0cDovL3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zIyI+CiAgICAgIDxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSIiCiAgICAgICAgICAgIHhtbG5zOnRpZmY9Imh0dHA6Ly9ucy5hZG9iZS5jb20vdGlmZi8xLjAvIgogICAgICAgICAgICB4bWxuczpleGlmPSJodHRwOi8vbnMuYWRvYmUuY29tL2V4aWYvMS4wLyIKICAgICAgICAgICAgeG1sbnM6ZGM9Imh0dHA6Ly9wdXJsLm9yZy9kYy9lbGVtZW50cy8xLjEvIgogICAgICAgICAgICB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iPgogICAgICAgICA8dGlmZjpZUmVzb2x1dGlvbj4xMDc0OC85MTwvdGlmZjpZUmVzb2x1dGlvbj4KICAgICAgICAgPHRpZmY6UmVzb2x1dGlvblVuaXQ+MzwvdGlmZjpSZXNvbHV0aW9uVW5pdD4KICAgICAgICAgPHRpZmY6WFJlc29sdXRpb24+MTA3NDgvOTE8L3RpZmY6WFJlc29sdXRpb24+CiAgICAgICAgIDx0aWZmOk9yaWVudGF0aW9uPjE8L3RpZmY6T3JpZW50YXRpb24+CiAgICAgICAgIDxleGlmOkNvbG9yU3BhY2U+MTwvZXhpZjpDb2xvclNwYWNlPgogICAgICAgICA8ZXhpZjpVc2VyQ29tbWVudD5DcmVhdGVkIHdpdGggR0lNUDwvZXhpZjpVc2VyQ29tbWVudD4KICAgICAgICAgPGRjOmRlc2NyaXB0aW9uPgogICAgICAgICAgICA8cmRmOkFsdD4KICAgICAgICAgICAgICAgPHJkZjpsaSB4bWw6bGFuZz0ieC1kZWZhdWx0Ij5DcmVhdGVkIHdpdGggR0lNUDwvcmRmOmxpPgogICAgICAgICAgICA8L3JkZjpBbHQ+CiAgICAgICAgIDwvZGM6ZGVzY3JpcHRpb24+CiAgICAgICAgIDx4bXA6TW9kaWZ5RGF0ZT4yMDIzLTA5LTIzVDExOjU2OjE2PC94bXA6TW9kaWZ5RGF0ZT4KICAgICAgICAgPHhtcDpDcmVhdG9yVG9vbD5HSU1QIDIuMTAuMjg8L3htcDpDcmVhdG9yVG9vbD4KICAgICAgPC9yZGY6RGVzY3JpcHRpb24+CiAgIDwvcmRmOlJERj4KPC94Onht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");
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    /* The mark is dark navy, so it needs a light rim to stay legible against a
+       dark photo, plus a shadow to lift it off a bright one. */
+    box-shadow: 0 0 0 1.5px rgba(255,255,255,0.8), 0 1px 5px rgba(0,0,0,0.5);
+    transition: transform 0.15s;
   }
-  .card-track:hover { background: var(--accent); }
+  .card-track:hover { transform: scale(1.12); }
 
   .card-img-dots {
     position: absolute;
@@ -2319,7 +2324,7 @@
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58 0-.29-.01-1.05-.02-2.06-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.34-5.47-5.95 0-1.31.47-2.39 1.24-3.23-.13-.3-.54-1.53.11-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.65 1.65.24 2.88.12 3.18.77.84 1.23 1.92 1.23 3.23 0 4.62-2.81 5.64-5.49 5.94.43.37.82 1.1.82 2.22 0 1.6-.02 2.9-.02 3.29 0 .32.22.7.82.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z"/></svg>
           <span>GitHub</span>
         </a>
-        <span class="app-version" id="appVersion" title="App version (bump in index.html when releasing)">v1.19.0</span>
+        <span class="app-version" id="appVersion" title="App version (bump in index.html when releasing)">v1.20.0</span>
       </div>
       <div class="dialog-foot-right">
         <button class="btn" type="button" id="settingsSecondary" hidden></button>
@@ -5140,7 +5145,8 @@ function cardHTML(p, fresh) {
         <div class="card-category">${esc(p.category)}</div>
         ${groupBadge(p)}
         <a class="card-track" href="${esc(globeUrl(p.hex))}" target="_blank" rel="noopener noreferrer"
-           data-action="open-globe" title="Track ${esc(p.registration || p.hex)} on airplanes.live">Track</a>
+           data-action="open-globe" aria-label="Track ${esc(p.registration || p.hex)} on airplanes.live"
+           title="Track ${esc(p.registration || p.hex)} on airplanes.live"></a>
       </div>
       <div class="card-body" data-action="open-modal" style="cursor:pointer">
         <div class="card-type">${esc(p.type || p.icao_type)}</div>
