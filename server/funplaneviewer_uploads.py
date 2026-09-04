@@ -301,9 +301,15 @@ def _rotate_backup() -> None:
         # would otherwise overwrite the copy the first one just made — exactly
         # the copy you'd want back. Restoring a daily backup right after some
         # other save is a realistic way to hit that.
+        #
+        # The separator has to sort *after* "." or the dedup defeats itself: both
+        # the prune below and the history listing order these names lexically, and
+        # "-" (0x2D) < "." (0x2E) would file the newer copy as the oldest — first
+        # in line to be deleted. "_" (0x5F) sorts after, and zero-padding keeps
+        # _02 ahead of _10.
         suffix = 2
         while target.exists():
-            target = BACKUP_HISTORY_DIR / f"backup-{stamp}-{suffix}.json"
+            target = BACKUP_HISTORY_DIR / f"backup-{stamp}_{suffix:02d}.json"
             suffix += 1
         shutil.copy2(BACKUP_JSON, target)
     except OSError as err:

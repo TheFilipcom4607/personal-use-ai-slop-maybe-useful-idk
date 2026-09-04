@@ -7,4 +7,4 @@ __pycache__/
 
 # Local Claude tooling / notes
 .claude/
-VERY IMPORTANT READ CLAUDE.txt
+CLAUDE.local.md

@@ -2324,7 +2324,7 @@
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58 0-.29-.01-1.05-.02-2.06-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.34-5.47-5.95 0-1.31.47-2.39 1.24-3.23-.13-.3-.54-1.53.11-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.65 1.65.24 2.88.12 3.18.77.84 1.23 1.92 1.23 3.23 0 4.62-2.81 5.64-5.49 5.94.43.37.82 1.1.82 2.22 0 1.6-.02 2.9-.02 3.29 0 .32.22.7.82.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z"/></svg>
           <span>GitHub</span>
         </a>
-        <span class="app-version" id="appVersion" title="App version (bump in index.html when releasing)">v1.20.1</span>
+        <span class="app-version" id="appVersion" title="App version (bump in index.html when releasing)">v1.20.2</span>
       </div>
       <div class="dialog-foot-right">
         <button class="btn" type="button" id="settingsSecondary" hidden></button>
@@ -2574,7 +2574,9 @@ function appChoose({ title, message, choices }) {
 }
 
 function allPlanes() {
-  return data[activeSection];
+  // 'stats' is a tab but not a data bucket, so guard the lookup: every caller
+  // here (chips, filters, counts) would otherwise throw on the Stats tab.
+  return data[activeSection] || [];
 }
 
 function updateSectionCounts() {
@@ -3355,7 +3357,7 @@ function setSort(key) {
 function imgTag(url, p, extraClass) {
   const cls = extraClass ? ` ${extraClass}` : '';
   if (!url) return placeholderTag(p, extraClass);
-  return `<img class="card-real-img${cls}" src="${encodeURI(url)}" alt="${esc(p.type || '')}" loading="lazy" data-fallback-hex="${esc(p.hex)}">`;
+  return `<img class="card-real-img${cls}" src="${esc(url)}" alt="${esc(p.type || '')}" loading="lazy" data-fallback-hex="${esc(p.hex)}">`;
 }
 function placeholderTag(p, extraClass) {
   const cls = extraClass ? ` ${extraClass}` : '';
@@ -3554,25 +3556,32 @@ async function loadServerBackup() {
     try { localStorage.setItem(SERVER_BACKUP_SEEN_KEY, '1'); } catch (err) { /* private mode */ }
     clearWarning('server-backup');
     const sections = ['mil', 'gov', 'civ'];
-    let added = 0;
+    // Every plane the snapshot carries counts as a change: upsertBackup also
+    // merges into records that already exist, and a length check can't see those
+    // -- so server-side edits used to sit in importedBackups until the next poll.
+    let applied = 0;
     sections.forEach(section => {
       const list = Array.isArray(snapshot.backups[section]) ? snapshot.backups[section] : [];
       list.forEach(plane => {
         if (!plane || !plane.hex) return;
-        const before = importedBackups[section].length;
         upsertBackup(section, plane);
-        if (importedBackups[section].length > before) added++;
+        applied++;
       });
     });
-    if (added) {
+    if (applied) {
       refreshMergedData();
       updateSectionCounts();
-      buildCategoryChips();
-      if (!modalHex) preservingScroll(render);
+      // The Stats tab owns #content, so painting the aircraft list over it would
+      // wipe the dashboard. This block also sits inside the try below, so a throw
+      // here would surface as a bogus "couldn't reach the Pi" warning.
+      if (activeSection !== 'stats') {
+        buildCategoryChips();
+        if (!modalHex) preservingScroll(render);
+      }
       const pill = document.getElementById('updatedPill');
       if (pill) pill.textContent = `Loaded ${backupCount()} backup aircraft (incl. server snapshot)`;
     }
-    return added > 0;
+    return applied > 0;
   } catch (err) {
     // The sidecar is optional, so only complain to someone who has loaded a
     // server snapshot in this browser before. For them a failure means aircraft
@@ -3913,7 +3922,7 @@ function renderPhotoHeader(hex, p) {
 
   const first = (p ? getImages(p) : getManualImageLinks(hex))[0] || '';
   thumb.innerHTML = first
-    ? `<img src="${encodeURI(first)}" alt="" onerror="this.closest('.photo-head-thumb').textContent='photo'">`
+    ? `<img src="${esc(first)}" alt="" onerror="this.closest('.photo-head-thumb').textContent='photo'">`
     : 'photo';
 
   if (p) {
@@ -4460,6 +4469,7 @@ async function removeManualImageEntry() {
   if (!where) return;
 
   const updatedPill = document.getElementById('updatedPill');
+  let failed = false;
 
   try {
     if (where === 'local' || where === 'both') {
@@ -4471,13 +4481,16 @@ async function removeManualImageEntry() {
       await deleteServerManualImage(hex);
     }
   } catch (err) {
+    failed = true;
     updatedPill.textContent = `Server remove failed for ${hex}`;
     await appAlert('Server Remove Failed', `Could not remove on the Pi: ${err.message}`);
     // Continue to refresh UI so any local change still shows.
   }
 
   resetImageIndex(hex);
-  updatedPill.textContent = `Removed manual image links for ${hex}`;
+  // A server-only entry that failed to delete is still there, so leave the
+  // failure text standing rather than overwriting it with a false success.
+  if (!failed) updatedPill.textContent = `Removed manual image links for ${hex}`;
   populateManualImageSelect(hex);
   fillManualImageFields(hex);
   // modalHex is stored raw from dataset.hex (lowercase); hex here is normalized.
@@ -4519,7 +4532,7 @@ function buildCSV(planes) {
   const rows = planes.map(p =>
     fields.map(f => {
       const v = String(p[f] ?? '');
-      return (v.includes(',') || v.includes('"') || v.includes('\n'))
+      return (v.includes(',') || v.includes('"') || v.includes('\n') || v.includes('\r'))
         ? `"${v.replace(/"/g, '""')}"` : v;
     }).join(',')
   );
@@ -4842,7 +4855,8 @@ function applyTagLookup(planes, tagIndex, fallbackSection) {
     p.tag2 = valueOrFallback(p.tag2, info.tag2);
     p.tag3 = valueOrFallback(p.tag3, info.tag3);
     p.category = p.category && p.category !== 'Imported' ? p.category : (info.category || p.category);
-    p.group = valueOrFallback(p.group, normalizeGroup(info.group, fallbackSection));
+    // No p.group here: normalizeImportedPlane has already resolved it from the
+    // row plus the filename fallback, so it is never empty for the tag DB to fill.
     p.registration = valueOrFallback(p.registration, info.registration);
     p.operator = valueOrFallback(p.operator, info.operator);
     p.type = valueOrFallback(p.type, info.type);
@@ -5272,7 +5286,7 @@ function cycleImg(hex, dir) {
   if (!card) { render(); return; }
   const img = card.querySelector('.card-real-img');
   if (img) {
-    const nextSrc = encodeURI(imgs[idx] || '');
+    const nextSrc = imgs[idx] || '';
     if (img.getAttribute('src') !== nextSrc) img.setAttribute('src', nextSrc);
   } else {
     render();
@@ -5302,7 +5316,7 @@ function openModal(hex) {
   const imgs = getImages(p);
   const mainSlot = document.getElementById('modalImgSlot');
   if (imgs[0]) {
-    mainSlot.innerHTML = `<img class="modal-img card-real-img" id="modalImg" src="${encodeURI(imgs[0])}" alt="${esc(p.type || '')}" data-fallback-hex="${esc(p.hex)}">`;
+    mainSlot.innerHTML = `<img class="modal-img card-real-img" id="modalImg" src="${esc(imgs[0])}" alt="${esc(p.type || '')}" data-fallback-hex="${esc(p.hex)}">`;
   } else {
     mainSlot.innerHTML = `<div class="modal-img img-placeholder"><div class="ph-type">${esc(p.type || p.icao_type || '')}</div><div class="ph-op">${esc(p.operator || '')}</div></div>`;
   }
@@ -5312,13 +5326,14 @@ function openModal(hex) {
   const badgeLabel = grp === 'gov' ? 'GOV' : grp === 'civ' ? 'CIV' : 'MIL';
   document.getElementById('modalType').innerHTML =
     `${esc(p.type || p.icao_type)} <span class="modal-group-badge ${badgeClass}">${badgeLabel}</span>`;
-  document.getElementById('modalOperator').textContent = `${p.operator}${p.flight ? ' · ' + p.flight : ''}`;
+  document.getElementById('modalOperator').textContent =
+    `${p.operator || ''}${p.flight ? ' · ' + p.flight : ''}`;
 
   const thumbs = document.getElementById('modalThumbs');
   thumbs.hidden = imgs.length <= 1;
   thumbs.innerHTML = imgs.length > 1
     ? imgs.map((url, i) =>
-      `<img src="${encodeURI(url)}" class="${i === 0 ? 'selected' : ''}" data-url="${esc(url)}" onerror="this.style.display='none'">`
+      `<img src="${esc(url)}" class="${i === 0 ? 'selected' : ''}" data-url="${esc(url)}" onerror="this.style.display='none'">`
     ).join('')
     : '';
 
@@ -5348,7 +5363,7 @@ function selectModalImg(el, url) {
   const mainSlot = document.getElementById('modalImgSlot');
   const p = modalHex ? findPlane(modalHex) : null;
   if (p) {
-    mainSlot.innerHTML = `<img class="modal-img card-real-img" id="modalImg" src="${encodeURI(url)}" alt="${esc(p.type || '')}" data-fallback-hex="${esc(p.hex)}">`;
+    mainSlot.innerHTML = `<img class="modal-img card-real-img" id="modalImg" src="${esc(url)}" alt="${esc(p.type || '')}" data-fallback-hex="${esc(p.hex)}">`;
   }
   el.parentNode.querySelectorAll('img').forEach(x => x.classList.remove('selected'));
   el.classList.add('selected');
@@ -6308,7 +6323,7 @@ Promise.allSettled([
 ]).then(results => {
   const gotImages = results[0].status === 'fulfilled' && results[0].value;
   const gotBackup = results[1].status === 'fulfilled' && results[1].value;
-  if (gotImages || gotBackup) {
+  if ((gotImages || gotBackup) && activeSection !== 'stats') {
     buildCategoryChips();
     if (!modalHex) preservingScroll(render);
   }
