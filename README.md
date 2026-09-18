@@ -116,8 +116,10 @@ If the GUI loads but the aircraft list doesn't, the error message includes a *Ch
 
 > Note: if you access the GUI over HTTPS (for example via Tailscale Serve with TLS), the backend URL also needs to be HTTPS. Browsers block mixed HTTP/HTTPS requests.
 
+To view it from anywhere without Tailscale, publish the read-only copy through a Cloudflare Tunnel instead. nginx only forwards the GET endpoints the GUI reads, with a strict security policy and per-visitor rate limits. The tunnel runs as a sandboxed service, and the page hides Import and the hidden menus. See [Public view-only portal](server/README.md#public-view-only-portal).
+
 ## Optional Flask sidecar
 
-A small Flask sidecar adds shared server-side persistence for manual image links and imported backups, the automatic daily backups described above, plus a self-update button in the hidden menu that pulls the latest `index.html` from GitHub. It's strictly optional; without it the GUI works exactly as before, minus the daily backups.
+A small Flask sidecar adds shared server-side persistence for manual image links and imported backups, the automatic daily backups described above, plus a self-update button in the hidden menu that pulls the latest `index.html` from GitHub. It's strictly optional; without it the GUI works exactly as before, minus the daily backups. Changes can be locked behind a write token, which the GUI asks for once per browser.
 
 See [server/README.md](server/README.md) for setup.

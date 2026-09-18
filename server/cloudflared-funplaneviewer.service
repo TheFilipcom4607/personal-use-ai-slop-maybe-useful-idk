@@ -1,0 +1,60 @@
+# Cloudflare Tunnel for the public read-only portal (server/nginx-public.conf).
+# See "Public view-only portal" in server/README.md.
+#
+# Use this instead of `cloudflared service install <token>`. That one runs
+# cloudflared as root with the tunnel token on its command line, in a unit
+# file anyone on the Pi can read. With the token, anyone can run their own
+# connector for your tunnel and serve whatever they like at your hostname.
+# Here the token sits in a root-only file that systemd hands to the service
+# privately. cloudflared is the one process on the Pi talking to the
+# internet, so it also runs as a throwaway user with no privileges and a
+# read-only view of the system.
+#
+#   sudo sh -c 'umask 077; cat > /etc/cloudflared/funplaneviewer.token'
+#     (paste the token, Enter, Ctrl-D: keeps it out of shell history)
+#   sudo cp server/cloudflared-funplaneviewer.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now cloudflared-funplaneviewer
+#
+# Needs a current cloudflared (for --token-file) from Cloudflare's apt repo,
+# which is also how it gets updated: it doesn't rewrite its own binary.
+
+[Unit]
+Description=Cloudflare Tunnel for the funplaneviewer public portal
+After=network-online.target nginx.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+LoadCredential=tunnel-token:/etc/cloudflared/funplaneviewer.token
+ExecStart=/usr/bin/cloudflared --no-autoupdate tunnel run --token-file %d/tunnel-token
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=0
+
+DynamicUser=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

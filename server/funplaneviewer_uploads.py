@@ -19,12 +19,15 @@ Storage:
     A background thread writes today's file at $BACKUP_HOUR and prunes
     anything older than $BACKUP_KEEP_DAYS days.
 
-No auth: meant to sit behind nginx on a LAN/Tailscale-only host.
+Reads are open: meant to sit behind nginx on a LAN/Tailscale-only host.
+Writes need $FUNPLANEVIEWER_WRITE_TOKEN in an X-Upload-Token header once
+that's set (see WRITE_TOKEN below).
 """
 
 import csv
 import gzip
 import hashlib
+import hmac
 import io
 import json
 import os
@@ -102,19 +105,42 @@ UPDATE_MAX_BYTES = 10 * 1024 * 1024
 
 CSV_HEADER = ["$ICAO", "$Registration", "#ImageLink", "#ImageLink2", "#ImageLink3", "#ImageLink4"]
 
+# Every write (anything but GET/HEAD/OPTIONS: image links, backups, restores,
+# snapshots, self-update) must carry this in X-Upload-Token. Without it,
+# anything on the LAN or tailnet can change what the public portal shows, and
+# so can any web page open in a browser on that network, because the CORS
+# below lets it send the request. Unset keeps writes open, so upgrading this
+# file doesn't lock anyone out before the token is configured; the startup
+# log says so.
+WRITE_TOKEN = os.environ.get("FUNPLANEVIEWER_WRITE_TOKEN", "").strip()
+READ_METHODS = ("GET", "HEAD", "OPTIONS")
+
 # Global lock: single-process, low traffic; cheap correctness over throughput.
 _lock = threading.Lock()
 
 app = Flask(__name__)
 
 
+@app.before_request
+def _require_write_token():
+    if not WRITE_TOKEN or request.method in READ_METHODS:
+        return None
+    supplied = request.headers.get("X-Upload-Token", "")
+    # Constant-time, and on bytes: compare_digest refuses non-ASCII str.
+    if hmac.compare_digest(supplied.encode("utf-8"), WRITE_TOKEN.encode("utf-8")):
+        return None
+    return jsonify(ok=False, error="Write token missing or wrong."), 401
+
+
 @app.after_request
 def _allow_cors(response):
     """Permissive CORS: service is LAN/Tailscale-only behind nginx, and
-    the GUI may be served from a different origin during development."""
+    the GUI may be served from a different origin during development.
+    Cross-origin writes still need the write token, which other sites
+    don't have."""
     response.headers.setdefault("Access-Control-Allow-Origin", "*")
     response.headers.setdefault("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
-    response.headers.setdefault("Access-Control-Allow-Headers", "Content-Type")
+    response.headers.setdefault("Access-Control-Allow-Headers", "Content-Type, X-Upload-Token")
     return response
 
 
@@ -826,6 +852,11 @@ def self_update():
 # Started at import time so the daily job also runs under gunicorn/`flask run`,
 # not just the __main__ path below. Guarded so it only ever starts once.
 start_backup_scheduler()
+
+if not WRITE_TOKEN:
+    app.logger.warning(
+        "FUNPLANEVIEWER_WRITE_TOKEN is not set: anything that can reach this "
+        "service can change the data it serves. See server/README.md.")
 
 
 if __name__ == "__main__":

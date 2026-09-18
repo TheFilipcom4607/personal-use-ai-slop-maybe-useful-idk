@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Fun Plane Viewer</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<!-- Public read-only copy: server/nginx-public.conf sets an fpv_mode=public
+     cookie on this page's own response, so it's readable before any script
+     runs and costs no extra request. Nothing else sets it, which leaves every
+     feature on. Tagging <html> here keeps edit controls from flashing up. -->
+<script>
+window.FPV_PUBLIC = /(?:^|;\s*)fpv_mode=public(?:;|$)/.test(document.cookie);
+if (window.FPV_PUBLIC) document.documentElement.classList.add('public-mode');
+</script>
 <style>
   :root {
     --bg: #0d0f14;
@@ -1100,6 +1108,12 @@
     display: none;
   }
 
+  /* Public read-only copy: nothing that writes, nothing that re-points the backend. */
+  .public-mode #btnImport,
+  .public-mode #backendBtnErr {
+    display: none;
+  }
+
   .app-dialog-overlay {
     display: none;
     position: fixed;
@@ -1117,7 +1131,7 @@
   /* Confirm/alert and choose dialogs are always shown on top of any other
      open dialog (e.g. the manual-image menu, which stays open in the
      background while the user confirms a removal or picks Local vs Server). */
-  #appDialog, #appChooseDialog, #printerDialog { z-index: 10010; }
+  #appDialog, #appChooseDialog, #printerDialog, #writeTokenDialog { z-index: 10010; }
 
   .app-dialog {
     width: min(420px, 100%);
@@ -2324,7 +2338,7 @@
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58 0-.29-.01-1.05-.02-2.06-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.34-5.47-5.95 0-1.31.47-2.39 1.24-3.23-.13-.3-.54-1.53.11-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.65 1.65.24 2.88.12 3.18.77.84 1.23 1.92 1.23 3.23 0 4.62-2.81 5.64-5.49 5.94.43.37.82 1.1.82 2.22 0 1.6-.02 2.9-.02 3.29 0 .32.22.7.82.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z"/></svg>
           <span>GitHub</span>
         </a>
-        <span class="app-version" id="appVersion" title="App version (bump in index.html when releasing)">v1.20.2</span>
+        <span class="app-version" id="appVersion" title="App version (bump in index.html when releasing)">v1.21.0</span>
       </div>
       <div class="dialog-foot-right">
         <button class="btn" type="button" id="settingsSecondary" hidden></button>
@@ -2348,7 +2362,23 @@
   </div>
 </div>
 
+<div class="app-dialog-overlay" id="writeTokenDialog" aria-hidden="true">
+  <div class="app-dialog" role="dialog" aria-modal="true" aria-labelledby="writeTokenDialogTitle">
+    <h2 id="writeTokenDialogTitle">Write token</h2>
+    <p id="writeTokenDialogMessage"></p>
+    <input type="password" id="writeTokenDialogInput" class="backend-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Write token">
+    <div class="backend-hint">It's the <code>FUNPLANEVIEWER_WRITE_TOKEN</code> value in <code>/etc/funplaneviewer/write-token.env</code> on the Pi. Saved in this browser.</div>
+    <div class="app-dialog-actions">
+      <button class="btn" type="button" id="writeTokenDialogCancel">Cancel</button>
+      <button class="btn btn-active" type="button" id="writeTokenDialogSave">Save</button>
+    </div>
+  </div>
+</div>
+
 <script>
+// Served by server/nginx-public.conf, which proxies an allowlist of read-only
+// endpoints on its own origin and nothing else. See the cookie check in <head>.
+const PUBLIC_MODE = window.FPV_PUBLIC === true;
 const DEFAULT_API_PORT = 5173;
 const FALLBACK_API_BASE = `http://adsb-feeder.local:${DEFAULT_API_PORT}`;
 const API_BASE_STORAGE_KEY = 'adsbdisplay.apiBase.v1';
@@ -2384,7 +2414,11 @@ function defaultApiBase() {
   return FALLBACK_API_BASE;
 }
 
-let API_BASE = loadStoredApiBase() || defaultApiBase();
+// The public copy only exposes SkyStats through its own origin (:5173 isn't
+// reachable from outside), and ignores any override a visitor might have stored.
+let API_BASE = PUBLIC_MODE
+  ? window.location.origin
+  : (loadStoredApiBase() || defaultApiBase());
 // SkyStats splits interesting aircraft four ways (Mil / Gov / Civ / Pol) but this
 // GUI only has three tabs. Police airframes are state-operated law enforcement
 // rather than armed forces, so they're folded into Government everywhere: the
@@ -3522,8 +3556,78 @@ async function loadServerManualImages() {
   }
 }
 
+// --- Write token ---
+// With FUNPLANEVIEWER_WRITE_TOKEN set on the Pi, the sidecar refuses every
+// write without it (see server/README.md). This browser keeps the token in
+// localStorage and sends it on every sidecarFetch() call: all the writes, plus
+// the backups list that shares fetchJson(). The first 401 asks for it and
+// retries once; so does a saved token the Pi has stopped accepting. Reads stay
+// open, and the public portal never writes, so it never has a token.
+const WRITE_TOKEN_STORAGE_KEY = 'adsbdisplay.writeToken.v1';
+let writeTokenResolve = null;
+let writeTokenPrompt = null;  // shared, so writes that 401 together ask once
+
+function loadWriteToken() {
+  try { return localStorage.getItem(WRITE_TOKEN_STORAGE_KEY) || ''; }
+  catch (_) { return ''; }
+}
+
+function storeWriteToken(value) {
+  try { localStorage.setItem(WRITE_TOKEN_STORAGE_KEY, value); }
+  catch (_) { /* private mode: it just gets asked for again next time */ }
+}
+
+function askWriteToken(rejected) {
+  return new Promise(resolve => {
+    const overlay = document.getElementById('writeTokenDialog');
+    const input = document.getElementById('writeTokenDialogInput');
+    document.getElementById('writeTokenDialogMessage').textContent = rejected
+      ? 'The Pi rejected the write token saved in this browser. Enter the current one.'
+      : 'This Pi only accepts changes from browsers that have its write token.';
+    input.value = '';
+    writeTokenResolve = resolve;
+    overlay.classList.add('open');
+    overlay.setAttribute('aria-hidden', 'false');
+    // Don't auto-focus on touch devices - it pops the on-screen keyboard.
+    if (window.matchMedia('(pointer: fine)').matches) {
+      setTimeout(() => input.focus(), 0);
+    }
+  });
+}
+
+function closeWriteTokenDialog(value) {
+  if (!writeTokenResolve) return;
+  const overlay = document.getElementById('writeTokenDialog');
+  overlay.classList.remove('open');
+  overlay.setAttribute('aria-hidden', 'true');
+  const resolve = writeTokenResolve;
+  writeTokenResolve = null;
+  resolve(value);
+}
+
+// fetch() for the sidecar, carrying the write token. Bodies are always strings
+// here, so the retry can resend them as-is.
+async function sidecarFetch(url, options = {}) {
+  const send = () => {
+    const headers = new Headers(options.headers);
+    const token = loadWriteToken();
+    if (token) headers.set('X-Upload-Token', token);
+    return fetch(url, { ...options, headers });
+  };
+  const res = await send();
+  if (res.status !== 401) return res;
+  if (!writeTokenPrompt) {
+    writeTokenPrompt = askWriteToken(Boolean(loadWriteToken()))
+      .finally(() => { writeTokenPrompt = null; });
+  }
+  const token = await writeTokenPrompt;
+  if (!token) return res;
+  storeWriteToken(token);
+  return send();
+}
+
 async function postServerManualImage(hex, links, registration) {
-  const res = await fetch(`${UPLOADS_API_BASE}/images`, {
+  const res = await sidecarFetch(`${UPLOADS_API_BASE}/images`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ hex, links, registration: registration || '' })
@@ -3537,7 +3641,7 @@ async function postServerManualImage(hex, links, registration) {
 }
 
 async function deleteServerManualImage(hex) {
-  const res = await fetch(`${UPLOADS_API_BASE}/images/${encodeURIComponent(hex)}`, { method: 'DELETE' });
+  const res = await sidecarFetch(`${UPLOADS_API_BASE}/images/${encodeURIComponent(hex)}`, { method: 'DELETE' });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new Error(`HTTP ${res.status}${text ? `: ${text}` : ''}`);
@@ -3609,7 +3713,7 @@ async function postServerBackup(section, filename) {
     savedAt: new Date().toISOString(),
     backups: importedBackups
   };
-  const res = await fetch(`${UPLOADS_API_BASE}/backup`, {
+  const res = await sidecarFetch(`${UPLOADS_API_BASE}/backup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -3638,10 +3742,12 @@ const SNAPSHOTS_API = `${UPLOADS_API_BASE}/snapshots`;
 let backupsBusy = false;
 
 async function fetchJson(url, options) {
-  const res = await fetch(url, { cache: 'no-store', ...options });
+  const res = await sidecarFetch(url, { cache: 'no-store', ...options });
   const payload = await res.json().catch(() => null);
   if (!res.ok || (payload && payload.ok === false)) {
-    throw new Error((payload && payload.error) || `HTTP ${res.status}`);
+    const err = new Error((payload && payload.error) || `HTTP ${res.status}`);
+    err.status = res.status;
+    throw err;
   }
   return payload;
 }
@@ -3860,6 +3966,8 @@ async function runBackupNow() {
     try {
       snapshot = (await fetchJson(`${SNAPSHOTS_API}/run`, { method: 'POST' })).snapshot;
     } catch (err) {
+      // No write token: the fallback is a write too, so don't ask twice.
+      if (err.status === 401) throw err;
       // The sidecar couldn't reach SkyStats (different host, firewall). This
       // browser clearly can, so hand it the list we already have.
       snapshot = (await fetchJson(SNAPSHOTS_API, {
@@ -4345,7 +4453,7 @@ async function runSelfUpdate() {
   // On success the page reloads anyway, so the dialog goes with it.
   closeSettingsMenu();
   try {
-    const res = await fetch(`${UPLOADS_API_BASE}/self-update`, {
+    const res = await sidecarFetch(`${UPLOADS_API_BASE}/self-update`, {
       method: 'POST',
       cache: 'no-store',
     });
@@ -5386,6 +5494,10 @@ function closeModal(e) {
 // itself rather than close the list behind it.
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
+  if (writeTokenResolve) {
+    closeWriteTokenDialog('');
+    return;
+  }
   if (document.getElementById('printerDialog').classList.contains('open')) {
     closePrinterDialog();
     return;
@@ -5992,6 +6104,17 @@ document.getElementById('printerDialogInput').addEventListener('keydown', (e) =>
   if (e.key === 'Enter') { e.preventDefault(); document.getElementById('printerDialogPrint').click(); }
 });
 
+document.getElementById('writeTokenDialogCancel').addEventListener('click', () => closeWriteTokenDialog(''));
+document.getElementById('writeTokenDialogSave').addEventListener('click', () => {
+  closeWriteTokenDialog(document.getElementById('writeTokenDialogInput').value.trim());
+});
+document.getElementById('writeTokenDialog').addEventListener('click', (e) => {
+  if (e.target.id === 'writeTokenDialog') closeWriteTokenDialog('');
+});
+document.getElementById('writeTokenDialogInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('writeTokenDialogSave').click(); }
+});
+
 // Triple-tap/click detection that works on touch too (MouseEvent.detail
 // is unreliable on iOS Safari, so count clicks within a rolling window).
 function onTripleClick(el, handler) {
@@ -6005,8 +6128,9 @@ function onTripleClick(el, handler) {
 }
 
 // Hidden menus: triple-click/tap the title for Settings, or any aircraft photo
-// (in the detail modal) for the image-links editor.
-onTripleClick(document.getElementById('appTitle'), () => openSettingsMenu());
+// (in the detail modal) for the image-links editor. Neither exists on the
+// public copy - its nginx would refuse every write they make anyway.
+if (!PUBLIC_MODE) onTripleClick(document.getElementById('appTitle'), () => openSettingsMenu());
 (() => {
   const search = document.getElementById('manualImagePlaneSearch');
   const box = document.getElementById('manualImageSuggestions');
@@ -6179,7 +6303,7 @@ document.getElementById('modalThumbs').addEventListener('click', (e) => {
 });
 // Hidden gesture: triple-click/tap the main modal photo to edit photos for this plane.
 // Mirrors the triple-click-title gesture for the global menu.
-onTripleClick(document.getElementById('modalImgSlot'), () => {
+if (!PUBLIC_MODE) onTripleClick(document.getElementById('modalImgSlot'), () => {
   if (modalHex) openManualImageMenu(modalHex);
 });
 

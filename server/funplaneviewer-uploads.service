@@ -26,6 +26,12 @@ Environment=FUNPLANEVIEWER_BACKUP_KEEP_DAYS=30
 # Set to 0 to keep the endpoints but stop the automatic daily run.
 Environment=FUNPLANEVIEWER_BACKUP_ENABLED=1
 
+# Write token: FUNPLANEVIEWER_WRITE_TOKEN=<secret> in a root-only file, so it
+# never sits in this world-readable unit. The leading "-" makes the file
+# optional; without it, writes are open to anything on the network. See
+# "Write token" in server/README.md.
+EnvironmentFile=-/etc/funplaneviewer/write-token.env
+
 # python3 with Flask installed system-wide, in a venv, or via pipx.
 # If you use a venv, point this at /opt/funplaneviewer/venv/bin/python.
 ExecStart=/usr/bin/python3 /opt/funplaneviewer/server/funplaneviewer_uploads.py
