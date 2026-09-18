@@ -39,11 +39,34 @@ ExecStart=/usr/bin/python3 /opt/funplaneviewer/server/funplaneviewer_uploads.py
 Restart=on-failure
 RestartSec=3
 
-# Hardening
+# Hardening. What the public portal shows comes from this service, so it
+# gets a read-only view of the system, no privileges, and nothing but
+# ordinary networking: localhost for nginx and SkyStats, and GitHub for
+# self-update. `systemd-analyze security funplaneviewer-uploads` scores it.
 NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+# No UMask= on purpose: index.html written by self-update must stay
+# world-readable, or nginx (www-data) can't serve it.
 # `/opt/funplaneviewer` is writable so the self-update endpoint can
 # replace `index.html`. The service user still needs filesystem
 # ownership of that path — see server/README.md.
