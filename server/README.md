@@ -209,7 +209,7 @@ the viewing device, published through a Cloudflare Tunnel so nothing is
 port-forwarded and your home IP stays hidden:
 
 ```
-https://planes.thefilip.com ─► Cloudflare (TLS, WAF) ─► cloudflared (Pi, outbound only)
+https://fpv.thefilip.com ─► Cloudflare (TLS, WAF) ─► cloudflared (Pi, outbound only)
   ─► nginx 127.0.0.1:8088 (nginx-public.conf) ─► SkyStats :5173 / sidecar :5174
 ```
 
@@ -309,7 +309,7 @@ sudo apt-get update && sudo apt-get install -y cloudflared
    ```
 
    The dashboard should now show the connector as healthy.
-5. In the tunnel's *Public Hostname* tab, add `planes` · `thefilip.com` →
+5. In the tunnel's *Public Hostname* tab, add `fpv` · `thefilip.com` →
    type `HTTP`, URL `127.0.0.1:8088`. Cloudflare creates the DNS record.
    - Point it at `:8088` only. Never use the LAN site's own port, the
      adsb.im UI on `:80`, tar1090 on `:8080`, SkyStats on `:5173` or the
@@ -323,10 +323,10 @@ scoped to the hostname. The TLS settings are zone-wide, so they cover the
 rest of thefilip.com too.
 
 - **Security → WAF → Custom rules:** block
-  `(http.host eq "planes.thefilip.com" and not http.request.method in {"GET" "HEAD"})`,
+  `(http.host eq "fpv.thefilip.com" and not http.request.method in {"GET" "HEAD"})`,
   so writes never even reach the tunnel.
 - **Security → WAF → Rate limiting rules:** for
-  `http.host eq "planes.thefilip.com"`, block any IP making more than 100
+  `http.host eq "fpv.thefilip.com"`, block any IP making more than 100
   requests per 10 seconds.
 - **SSL/TLS → Edge Certificates:** turn *Always Use HTTPS* on and set
   *Minimum TLS Version* to 1.2.
@@ -339,10 +339,10 @@ rest of thefilip.com too.
 From outside your network (phone on mobile data):
 
 ```sh
-curl -si https://planes.thefilip.com/api/stats/interesting/military | head -1   # 200
-curl -si -X POST https://planes.thefilip.com/api/uploads/self-update | head -1  # 403 (WAF rule) or 405 (nginx)
-curl -si https://planes.thefilip.com/api/uploads/snapshots | head -1            # 404
-curl -sI https://planes.thefilip.com/ | grep -iE 'set-cookie|content-security'  # fpv_mode=public, the CSP
+curl -si https://fpv.thefilip.com/api/stats/interesting/military | head -1   # 200
+curl -si -X POST https://fpv.thefilip.com/api/uploads/self-update | head -1  # 403 (WAF rule) or 405 (nginx)
+curl -si https://fpv.thefilip.com/api/uploads/snapshots | head -1            # 404
+curl -sI https://fpv.thefilip.com/ | grep -iE 'set-cookie|content-security'  # fpv_mode=public, the CSP
 ```
 
 A second request to the same feed within 30s should show
